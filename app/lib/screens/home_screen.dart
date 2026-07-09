@@ -67,7 +67,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // 계산 횟수 증가
     await _storage?.incrementCalculationCount();
 
-    // 인터스티셜 광고 표시 (3회마다)
+    // 인터스티셜 광고 표시 (2회마다, 첫 계산 면제)
     await AdService().showInterstitialIfEligible();
 
     // 결과 화면으로 이동
