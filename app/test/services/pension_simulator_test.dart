@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pension_compass/models/simulation_result.dart';
 import 'package:pension_compass/services/pension_simulator.dart';
+import 'package:pension_compass/services/withdrawal_strategies.dart';
 
 void main() {
   group('payoutLimitFor — 연금수령한도 10년 룰', () {
@@ -95,6 +96,31 @@ void main() {
       final pension = details.firstWhere(
         (d) => d.source == WithdrawalSource.pensionDeducted);
       expect(pension.tax, 770000); // 절벽 미발동 — 14M × 5.5%
+    });
+  });
+
+  group('kStrategies — 전략 정의', () {
+    test('4개 전략, id 유일, pension_first 포함', () {
+      expect(kStrategies.length, 4);
+      final ids = kStrategies.map((s) => s.id).toSet();
+      expect(ids.length, 4);
+      expect(ids, contains('pension_first'));
+      expect(kStrategies.first.id, 'fill_bracket'); // 동률 시 우선
+    });
+
+    test('fill_bracket: 과세재원 스텝은 bracket+payout 캡 준수', () {
+      final fb = kStrategies.firstWhere((s) => s.id == 'fill_bracket');
+      final first = fb.steps.first;
+      expect(first.source, WithdrawalSource.pensionDeducted);
+      expect(first.useBracketCap, true);
+      expect(first.usePayoutCap, true);
+    });
+
+    test('defer_taxable: 과세재원은 70세부터 활성', () {
+      final dt = kStrategies.firstWhere((s) => s.id == 'defer_taxable');
+      final taxableSteps = dt.steps
+          .where((s) => kBracketSources.contains(s.source));
+      expect(taxableSteps.every((s) => s.activeFromAge == 70), true);
     });
   });
 }
