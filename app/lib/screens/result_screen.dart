@@ -313,7 +313,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                           amount: result.totalTaxOptimal,
                           color: AppColors.navy,
                           formatter: formatter,
-                          subtitle: '비과세부터 인출',
+                          subtitle: result.optimalStrategyName,
                         ),
                       ),
                     ],
@@ -532,6 +532,16 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
             title: '계산 기준 안내',
             content: '연 1,500만원 초과 시 16.5% 분리과세를 가정한 보수적 계산 결과입니다. 실제로는 종합과세 선택이 유리할 수 있으니 세무사 상담을 권장합니다.',
             backgroundColor: AppColors.gray100,
+          ),
+          const SizedBox(height: 12),
+
+          // 4. 시뮬레이션 가정 안내
+          _buildTipCard(
+            icon: Icons.trending_up,
+            iconColor: AppColors.navy,
+            title: '시뮬레이션 가정',
+            content: '남은 잔액은 입력한 연 수익률로 복리 성장하며, 운용수익은 세법에 따라 과세 재원으로 편입해 계산합니다. 연금수령한도(10년 룰) 초과 인출은 16.5% 과세로 반영됩니다. 4가지 인출 전략을 전 기간 시뮬레이션해 비교한 결과입니다.',
+            backgroundColor: AppColors.navy.withAlpha(15),
           ),
         ],
       ),
@@ -798,15 +808,9 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
 
   Widget _buildChart(SimulationResult result) {
     final cumulativeOptimal = result.cumulativeTaxOptimal;
-    
-    // 기존 방식 누적 세금 계산 (간이)
-    final cumulativeBaseline = <int>[];
-    int cumulative = 0;
-    for (int i = 0; i < result.schedule.length; i++) {
-      // 기존 방식은 연 평균 세금이 더 높다고 가정
-      cumulative += (result.totalTaxBaseline / result.schedule.length).round();
-      cumulativeBaseline.add(cumulative);
-    }
+
+    // 기존 방식 누적 세금 — baseline 전략의 실제 연도별 스케줄
+    final cumulativeBaseline = result.cumulativeTaxBaseline;
 
     final maxY = (cumulativeBaseline.isNotEmpty
             ? cumulativeBaseline.last

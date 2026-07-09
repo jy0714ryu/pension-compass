@@ -263,6 +263,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       .read(pensionInputProvider.notifier)
                       .updateTargetAnnualWithdrawal(v),
                 ),
+                const SizedBox(height: 16),
+                NumberInputField(
+                  label: '예상 연 수익률 (복리)',
+                  value: (input.expectedReturnRate * 100).round(),
+                  suffix: '%',
+                  min: 0,
+                  max: 15,
+                  onChanged: (v) => ref
+                      .read(pensionInputProvider.notifier)
+                      .updateExpectedReturnRate(v / 100.0),
+                ),
               ],
             ),
             const SizedBox(height: 24),

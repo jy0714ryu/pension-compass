@@ -13,6 +13,7 @@ class LocalStorageService {
   static const String _keyTargetAnnualWithdrawal = 'target_annual_withdrawal';
   static const String _keySimulationYears = 'simulation_years';
   static const String _keyIncomeLevel = 'income_level';
+  static const String _keyExpectedReturnRate = 'expected_return_rate';
   static const String _keyDisclaimerAccepted = 'disclaimer_accepted';
   static const String _keyCalculationCount = 'calculation_count';
   static const String _keyReviewRequested = 'review_requested';
@@ -39,6 +40,7 @@ class LocalStorageService {
     await _prefs.setInt(_keyTargetAnnualWithdrawal, input.targetAnnualWithdrawal);
     await _prefs.setInt(_keySimulationYears, input.simulationYears);
     await _prefs.setString(_keyIncomeLevel, input.incomeLevel.name);
+    await _prefs.setDouble(_keyExpectedReturnRate, input.expectedReturnRate);
   }
 
   /// 저장된 입력값 불러오기
@@ -62,6 +64,7 @@ class LocalStorageService {
       targetAnnualWithdrawal: _prefs.getInt(_keyTargetAnnualWithdrawal) ?? 24000000,
       simulationYears: _prefs.getInt(_keySimulationYears) ?? 20,
       incomeLevel: incomeLevel,
+      expectedReturnRate: _prefs.getDouble(_keyExpectedReturnRate) ?? 0.04,
     );
   }
 

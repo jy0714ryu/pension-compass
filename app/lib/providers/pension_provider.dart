@@ -73,6 +73,10 @@ class PensionInputNotifier extends StateNotifier<PensionInput> {
     state = state.copyWith(simulationYears: value.clamp(1, 50));
   }
 
+  void updateExpectedReturnRate(double value) {
+    state = state.copyWith(expectedReturnRate: value.clamp(0.0, 0.20));
+  }
+
   void updateIncomeLevel(IncomeLevel level) {
     state = state.copyWith(incomeLevel: level);
   }
