@@ -13,18 +13,18 @@
 
 ## 🔲 대장님 액션 (순서대로)
 
-### 1. AdMob 콘솔 — 광고 단위 2개 발급
-[AdMob 콘솔](https://apps.admob.com) → 연금나침반 앱 → 광고 단위 추가:
-- **전면(Interstitial)** 1개 → ID 복사 (`ca-app-pub-7975666616683761/XXXXXXXXXX`)
-- **배너(Banner)** 1개 → ID 복사
+### 1. AdMob 콘솔 — 광고 단위 2개 발급 ✅ (2026-07-09 완료)
+- **전면(pension_interstitial)**: `ca-app-pub-7975666616683761/2384436395`
+- **배너(pension_banner)**: `ca-app-pub-7975666616683761/3043710701`
 
-### 2. 릴리스 빌드 (실 광고 ID 주입)
+### 2. 릴리스 빌드 (실 광고 ID 주입) ✅ (2026-07-09 완료)
 ```bash
 cd ~/Workspace/pension-compass/app
 flutter build appbundle --release \
-  --dart-define=ADMOB_INTERSTITIAL_AD_UNIT_ID=ca-app-pub-7975666616683761/전면ID \
-  --dart-define=ADMOB_BANNER_AD_UNIT_ID=ca-app-pub-7975666616683761/배너ID
-# 산출물: build/app/outputs/bundle/release/app-release.aab
+  --dart-define=ADMOB_INTERSTITIAL_AD_UNIT_ID=ca-app-pub-7975666616683761/2384436395 \
+  --dart-define=ADMOB_BANNER_AD_UNIT_ID=ca-app-pub-7975666616683761/3043710701
+# 산출물: build/app/outputs/bundle/release/app-release.aab (Play 업로드용)
+# 실기기 테스트용 apk도 동일 --dart-define으로 build apk --release
 ```
 
 ### 3. 실기기 스모크 테스트 (⚠️ 필수 — Android 16 폰)
@@ -48,8 +48,10 @@ flutter build apk --release --dart-define=... (위와 동일) && flutter install
 - app-ads.txt: AdMob 요구 시 gongsi-hanjul의 `docs/APP_ADS_TXT_SETUP.md` 절차 재사용
 - 콘텐츠 등급 설문 + 금융 앱 고지: "투자 자문 아님" 면책 명시 (앱 내 disclaimer_dialog 이미 존재)
 
-### 5. 비공개 테스트 → 프로덕션
-Play 신규 개인 계정은 프로덕션 전 **비공개 테스트(테스터 12명·14일)** 요건 있음 — gongsi-hanjul과 동일 절차.
+### 5. 프로덕션 직행 (사업자 계정 — 비공개 테스트 면제)
+12명·14일 비공개 테스트 요건은 2023-11-13 이후 생성된 **개인** 계정에만 적용 — 사업자(조직) 계정은 면제.
+→ aab 업로드 → 프로덕션 트랙 제출. 신규 앱 첫 심사는 통상 수일 소요.
+(선택) 심사 대기 중 리스크 줄이려면 내부 테스트 트랙에 같은 aab를 올려 본인 폰으로 먼저 확인 가능.
 
 ## 알려진 한계 (v2 후속 백로그)
 
