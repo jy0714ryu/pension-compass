@@ -9,6 +9,10 @@
   - App ID (AndroidManifest): `ca-app-pub-7975666616683761~8296037385`
   - **debug/기본값 = Google 테스트 광고 ID** — 실 광고는 릴리스 빌드에 `--dart-define` 주입 필요 (아래)
 - [x] 릴리스 서명: `android/upload-keystore.jks` + `key.properties` 존재
+  - ⚠️ **업로드 키 = 공시한줄(gongsi-hanjul)과 공유** (SHA1 `47:6F:30:8C:...`): Play Console 첫 등록 시
+    공시한줄 키로 서명된 aab가 올라가 그 키가 업로드 키로 고정됨 (2026-07-09 "잘못된 키" 반려 진단).
+    독자 생성했던 키(`AC:A0:...`)는 `upload-keystore-UNUSED-ACA0.jks.bak`으로 보관 (미사용).
+    키 백업은 데스크탑 `공시한줄_서명키_백업/`이 동일 키를 커버. 분실 시 두 앱 모두 업로드 키 재설정 필요.
 - [x] privacy-policy.html (`docs/`) 존재
 
 ## 🔲 대장님 액션 (순서대로)
