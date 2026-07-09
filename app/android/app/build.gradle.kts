@@ -43,6 +43,10 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("release")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }
@@ -55,4 +59,10 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // play-services-ads 25.x가 초기화하는 WorkManager가 transitive로 work 2.7.0/room 2.2.5
+    // 화석 버전에 잡혀 기동 즉시 WorkDatabase 생성 크래시 → 최신 강제 (2026-07-09 실기기 진단)
+    implementation("androidx.work:work-runtime:2.10.1")
 }
