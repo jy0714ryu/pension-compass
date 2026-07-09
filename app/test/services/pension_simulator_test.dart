@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pension_compass/models/pension_input.dart';
 import 'package:pension_compass/models/simulation_result.dart';
 import 'package:pension_compass/services/pension_simulator.dart';
 import 'package:pension_compass/services/withdrawal_strategies.dart';
@@ -121,6 +122,76 @@ void main() {
       final taxableSteps = dt.steps
           .where((s) => kBracketSources.contains(s.source));
       expect(taxableSteps.every((s) => s.activeFromAge == 70), true);
+    });
+  });
+
+  group('PensionSimulator.run — 엔진', () {
+    test('복리 성장이 earnings 풀로 편입된다 (비공제분 1억, r=5%, 2년)', () {
+      const input = PensionInput(
+        pensionSavings: 100000000,
+        pensionSavingsDeducted: 0, // 전액 비공제 → 비과세
+        irpBalance: 0,
+        irpRetirementPortion: 0,
+        isaMaturity: 0,
+        currentAge: 58,
+        targetAnnualWithdrawal: 10000000,
+        simulationYears: 2,
+        expectedReturnRate: 0.05,
+      );
+      final outcome = PensionSimulator.run(input, taxFreeFirst);
+      // 1년차: 10M 인출 → 잔액 90M → 성장 4.5M
+      // 2년차: 10M 인출 → 비공제 80M, earnings 4.5M → 성장 4M + 225K
+      expect(outcome.totalTax, 0); // earnings 미인출 — 전부 비과세 인출
+      expect(outcome.totalWithdrawn, 20000000);
+      expect(outcome.finalBalance, 88725000); // 80M + 4.5M + 4.225M
+    });
+
+    test('fallback: 과세재원만으로 목표 2,400만 충족 (절벽 감수)', () {
+      const input = PensionInput(
+        pensionSavings: 100000000,
+        pensionSavingsDeducted: 100000000, // 전액 과세재원
+        irpBalance: 0,
+        irpRetirementPortion: 0,
+        isaMaturity: 0,
+        currentAge: 58,
+        targetAnnualWithdrawal: 24000000,
+        simulationYears: 1,
+        expectedReturnRate: 0,
+      );
+      final outcome = PensionSimulator.run(input, fillBracket);
+      final year1 = outcome.schedule.first;
+      expect(year1.totalAmount, 24000000); // 목표 충족
+      // 1년차 수령한도 = 1억/10×1.2 = 1,200만 → 한도 내 1,200만은
+      // 1,500만 이하라 절벽 미발동(5.5%), 한도 초과 1,200만은 16.5%
+      expect(year1.totalTax, 660000 + 1980000);
+    });
+
+    test('전략 간 비교: example 입력에서 fill_bracket 세금 < pension_first 세금', () {
+      final input = PensionInput.example();
+      final smart = PensionSimulator.run(input, fillBracket);
+      final naive = PensionSimulator.run(input, pensionFirst);
+      expect(smart.totalTax, lessThan(naive.totalTax));
+    });
+
+    test('defer_taxable: 70세 전엔 과세재원 인출 없음 (재원 충분 시)', () {
+      const input = PensionInput(
+        pensionSavings: 200000000,
+        pensionSavingsDeducted: 100000000, // 비공제 1억 + 공제 1억
+        irpBalance: 0,
+        irpRetirementPortion: 0,
+        isaMaturity: 0,
+        currentAge: 58,
+        targetAnnualWithdrawal: 12000000,
+        simulationYears: 5,
+        expectedReturnRate: 0,
+      );
+      final outcome = PensionSimulator.run(input, deferTaxable);
+      for (final year in outcome.schedule) {
+        final taxableDrawn = year.withdrawals
+            .where((d) => kBracketSources.contains(d.source))
+            .fold<int>(0, (s, d) => s + d.amount);
+        expect(taxableDrawn, 0, reason: '${year.age}세에 과세재원 인출됨');
+      }
     });
   });
 }

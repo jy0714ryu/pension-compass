@@ -1,5 +1,7 @@
+import '../models/pension_input.dart';
 import '../models/simulation_result.dart';
 import 'tax_calculator.dart';
+import 'withdrawal_strategies.dart';
 
 /// 사적연금 과세재원 저율 분리과세 연간 한도 (원)
 /// 수령한도 내 인정액 합계가 이를 초과하면 그 해 인정액 전액 16.5% (절벽)
@@ -121,5 +123,113 @@ class PensionSimulator {
     }
 
     return details;
+  }
+
+  /// 단일 전략 시뮬레이션 — 연 단위 인출 → 연말 세금 확정 → 복리 성장 편입
+  static StrategyOutcome run(PensionInput input, WithdrawalStrategy strategy) {
+    final pools = <WithdrawalSource, int>{
+      WithdrawalSource.isaProfit: input.isaProfit,
+      WithdrawalSource.isaPrincipal: input.isaPrincipal,
+      WithdrawalSource.pensionNonDeducted: input.pensionSavingsNonDeducted,
+      WithdrawalSource.pensionDeducted: input.pensionSavingsDeducted,
+      WithdrawalSource.irpSelf: input.irpSelfContribution,
+      WithdrawalSource.earnings: 0,
+      WithdrawalSource.irpRetirement: input.irpRetirementPortion,
+    };
+
+    final schedule = <YearlyWithdrawal>[];
+    var totalTax = 0;
+    var totalWithdrawn = 0;
+
+    for (int year = 1; year <= input.simulationYears; year++) {
+      final age = input.currentAge + year - 1;
+      var payoutRemaining = payoutLimitFor(pools, year);
+      var bracketRemaining = kAnnualPensionBracket;
+      var remaining = input.targetAnnualWithdrawal;
+      final ledger = <WithdrawalSource, DrawSplit>{};
+
+      // 풀 차감 + 원장 기록 + 한도 소진 (amount는 호출부에서 available 이내 보장)
+      void draw(WithdrawalSource src, int amount) {
+        if (amount <= 0) return;
+        pools[src] = (pools[src] ?? 0) - amount;
+        remaining -= amount;
+        final split = ledger.putIfAbsent(src, DrawSplit.new);
+        if (kPayoutLimitedSources.contains(src)) {
+          final within = amount.clamp(0, payoutRemaining);
+          split.within += within;
+          split.over += amount - within;
+          payoutRemaining -= within;
+          if (kBracketSources.contains(src)) {
+            bracketRemaining = (bracketRemaining - within).clamp(0, 1 << 60);
+          }
+        } else {
+          split.within += amount; // 한도 미적용 소스는 전액 within
+        }
+      }
+
+      // 1) 전략 스텝 순회 (캡 준수)
+      for (final step in strategy.steps) {
+        if (remaining <= 0) break;
+        if (age < step.activeFromAge) continue;
+        final available = pools[step.source] ?? 0;
+        if (available <= 0) continue;
+        var cap = available;
+        if (step.usePayoutCap && kPayoutLimitedSources.contains(step.source)) {
+          cap = cap.clamp(0, payoutRemaining);
+        }
+        if (step.useBracketCap && kBracketSources.contains(step.source)) {
+          cap = cap.clamp(0, bracketRemaining);
+        }
+        draw(step.source, remaining.clamp(0, cap));
+      }
+
+      // 2) 폴백 — 목표 미달 시 캡 무시 (세금 페널티 감수, 현실 반영)
+      for (final src in kFallbackOrder) {
+        if (remaining <= 0) break;
+        final available = pools[src] ?? 0;
+        if (available <= 0) continue;
+        draw(src, remaining.clamp(0, available));
+      }
+
+      // 3) 연말 세금 확정
+      final yearly = YearlyWithdrawal(
+        year: year,
+        age: age,
+        withdrawals: finalizeYearTax(ledger, age, year),
+      );
+      schedule.add(yearly);
+      totalTax += yearly.totalTax;
+      totalWithdrawn += yearly.totalAmount;
+
+      // 4) 복리 성장 — 남은 잔액 × 수익률, 전액 과세재원(운용수익) 편입
+      var growth = 0;
+      pools.forEach((src, balance) {
+        if (balance > 0) growth += (balance * input.expectedReturnRate).round();
+      });
+      pools[WithdrawalSource.earnings] =
+          (pools[WithdrawalSource.earnings] ?? 0) + growth;
+
+      if (pools.values.every((v) => v <= 0)) break;
+    }
+
+    // 기말 잔액과 잠재세 (근사: 과세재원×기말나이 저율, 퇴직금×3.5%)
+    final endAge = input.currentAge + schedule.length - 1;
+    final taxableLeft = kBracketSources.fold<int>(
+        0, (s, src) => s + (pools[src] ?? 0));
+    final retirementLeft = pools[WithdrawalSource.irpRetirement] ?? 0;
+    final latentTax =
+        (taxableLeft * TaxCalculator.getPensionTaxRate(endAge)).round() +
+            (retirementLeft * kRetirementEffectiveRate * 0.7).round();
+    final finalBalance = pools.values.fold<int>(0, (s, v) => s + v);
+
+    return StrategyOutcome(
+      strategyId: strategy.id,
+      strategyName: strategy.displayName,
+      schedule: schedule,
+      totalTax: totalTax,
+      totalWithdrawn: totalWithdrawn,
+      finalBalance: finalBalance,
+      latentTax: latentTax,
+    );
   }
 }
