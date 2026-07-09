@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -812,10 +814,15 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
     // 기존 방식 누적 세금 — baseline 전략의 실제 연도별 스케줄
     final cumulativeBaseline = result.cumulativeTaxBaseline;
 
-    final maxY = (cumulativeBaseline.isNotEmpty
-            ? cumulativeBaseline.last
-            : cumulativeOptimal.last)
-        .toDouble();
+    // 전액 비과세 입력 등으로 누적 세금이 0(또는 스케줄이 비어있음)이면
+    // maxY=0 → horizontalInterval: maxY / 4 가 0.0이 되어 fl_chart 크래시
+    // (debug assert / release UnsupportedError). 최소 1.0으로 floor.
+    final maxY = math.max(
+        (cumulativeBaseline.isNotEmpty
+                ? cumulativeBaseline.last
+                : (cumulativeOptimal.isNotEmpty ? cumulativeOptimal.last : 0))
+            .toDouble(),
+        1.0);
 
     return LineChart(
       LineChartData(

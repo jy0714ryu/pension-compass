@@ -202,6 +202,8 @@ class PensionSimulator {
       totalWithdrawn += yearly.totalAmount;
 
       // 4) 복리 성장 — 남은 잔액 × 수익률, 전액 과세재원(운용수익) 편입
+      // 비과세 풀(ISA·비공제분)의 성장분도 과세 earnings로 편입 — 보수적
+      // 단순화 (ISA 만기 후 연금계좌 이전 가정, UI '시뮬레이션 가정' 팁에 고지).
       var growth = 0;
       pools.forEach((src, balance) {
         if (balance > 0) growth += (balance * input.expectedReturnRate).round();
@@ -217,6 +219,9 @@ class PensionSimulator {
     final taxableLeft = kBracketSources.fold<int>(
         0, (s, src) => s + (pools[src] ?? 0));
     final retirementLeft = pools[WithdrawalSource.irpRetirement] ?? 0;
+    // 잠재세는 저율 일괄 근사 — 잔여 과세재원이 커서 향후 인출이 1,500만
+    // 절벽(16.5%)을 반복 유발하는 시나리오에서는 과소평가되어 과세이연
+    // 전략이 유리하게 편향될 수 있다 (MVP 근사, 절벽 반영은 P1 후속).
     final latentTax =
         (taxableLeft * TaxCalculator.getPensionTaxRate(endAge)).round() +
             (retirementLeft * kRetirementEffectiveRate * 0.7).round();

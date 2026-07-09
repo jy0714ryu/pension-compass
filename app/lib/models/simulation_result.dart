@@ -33,8 +33,9 @@ class SimulationResult {
     this.baselineSchedule = const [],
   });
 
-  /// 절감 금액
-  int get savings => totalTaxBaseline - totalTaxOptimal;
+  /// 절감 금액 — 우승 판정은 taxBurden(잠재세 포함) 기준이라 이론상
+  /// totalTaxOptimal이 baseline보다 클 수 있어 음수 방지 clamp 적용.
+  int get savings => (totalTaxBaseline - totalTaxOptimal).clamp(0, 1 << 60);
 
   /// 절감률 (%)
   double get savingsRate {
@@ -141,42 +142,6 @@ enum WithdrawalSource {
   final String taxType;
 
   const WithdrawalSource(this.displayName, this.taxType);
-
-  /// 기본 세율 (55~69세 기준)
-  double get baseTaxRate {
-    switch (this) {
-      case WithdrawalSource.isaProfit:
-      case WithdrawalSource.isaPrincipal:
-      case WithdrawalSource.pensionNonDeducted:
-        return 0;
-      case WithdrawalSource.pensionDeducted:
-      case WithdrawalSource.irpSelf:
-      case WithdrawalSource.earnings:
-        return 5.5;
-      case WithdrawalSource.irpRetirement:
-        return 3.85; // 퇴직소득세 평균 × 70%
-    }
-  }
-
-  /// 인출 우선순위 (낮을수록 먼저)
-  int get priority {
-    switch (this) {
-      case WithdrawalSource.isaProfit:
-        return 1;
-      case WithdrawalSource.isaPrincipal:
-        return 2;
-      case WithdrawalSource.pensionNonDeducted:
-        return 3;
-      case WithdrawalSource.pensionDeducted:
-        return 4;
-      case WithdrawalSource.earnings:
-        return 5;
-      case WithdrawalSource.irpSelf:
-        return 6;
-      case WithdrawalSource.irpRetirement:
-        return 7;
-    }
-  }
 }
 
 /// 단일 전략 시뮬레이션 결과 (토너먼트 참가자)
