@@ -27,8 +27,10 @@ dependencies:
   # 인앱 리뷰
   in_app_review: ^2.0.10
   
-  # 광고
-  # google_mobile_ads: ^9.0.0 # Android 16 호환성 문제
+  # 광고 (9.0.0: 이 프로젝트의 Gradle 9.1/AGP 9.0.1 기본 툴체인과 호환되는 유일한 버전.
+  # gongsi-hanjul 검증판 5.3.1은 구형 Groovy `configurations.all` 문법이 Gradle 9 API와
+  # 충돌해 `flutter build apk` 자체가 실패함 — 실측 후 9.0.0으로 전환. compileSdk 36 지원.)
+  google_mobile_ads: ^9.0.0
 
 dev_dependencies:
   flutter_test:

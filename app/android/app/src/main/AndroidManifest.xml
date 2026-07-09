@@ -31,12 +31,10 @@
             android:name="flutterEmbedding"
             android:value="2" />
         
-        <!-- AdMob App ID (비활성화 - Android 16 호환성 문제) -->
-        <!--
+        <!-- AdMob App ID -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-7975666616683761~8296037385"/>
-        -->
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
