@@ -33,7 +33,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.quantlog.pension_compass"
+        applicationId = "com.quantlog.pensioncompass"
         minSdk = flutter.minSdkVersion
         targetSdk = 35  // Android 15 (AdMob WorkManager 호환성)
         versionCode = flutter.versionCode
