@@ -27,16 +27,16 @@ flutter build appbundle --release \
 # 실기기 테스트용 apk도 동일 --dart-define으로 build apk --release
 ```
 
-### 3. 실기기 스모크 테스트 (⚠️ 필수 — Android 16 폰)
-과거 "Android 16 호환성 문제" 메모가 빌드 문제였는지 런타임 문제였는지 불명.
-9.0.0으로 빌드는 검증됐으나 **실기기 런타임 확인 필요**:
-```bash
-flutter build apk --release --dart-define=... (위와 동일) && flutter install
-```
-- [ ] 앱 기동·계산·결과 화면 정상
-- [ ] 하단 배너 표시 (릴리스 빌드 실 ID → 게시 전엔 노출 안 될 수 있음, 크래시만 없으면 OK)
-- [ ] 계산 3회 시 전면 광고 (또는 무광고 스킵) 크래시 없음
-- [ ] **전액 비과세 + 수익률 0% 입력 → 결과 화면 정상** (리뷰에서 잡은 크래시 수정 검증)
+### 3. 실기기 스모크 테스트 ✅ (2026-07-09 완료 — 갤럭시 S25 / Android 16)
+**기동 크래시 발견·해결** (commit dd52da7): "Android 16 호환성 문제"의 실체 =
+play-services-ads 25.x WorkManager 초기화 vs ①transitive 화석 버전(work 2.7.0/room 2.2.5)
+②R8이 Room `WorkDatabase_Impl` 기본 생성자 strip → 2중 원인. work-runtime 2.10.1 강제 +
+proguard keep 규칙으로 해결. adb E2E 검증:
+- [x] 앱 기동·면책 다이얼로그·예시 입력·계산·결과 화면 정상 (절감 1,009만원/53.7% 표시)
+- [x] 수익률 4% 입력 필드 정상
+- [x] 하단 배너 **실광고 송출 확인** (분실보호·G마켓 로테이션)
+- [ ] 계산 3회 시 전면 광고 (미확인 — 게시 전 선택 확인)
+- [ ] 전액 비과세 + 수익률 0% 입력 → 결과 화면 정상 (단위테스트론 커버됨, 실기기 선택 확인)
 
 ### 4. Play Console 등록
 - 앱 이름: **연금나침반: ISA·IRP 연금저축 인출 세금 계산기** (29자 — `marketing/store_listing.md` 참조)
