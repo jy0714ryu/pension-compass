@@ -3,16 +3,17 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 /// AdMob 전면(Interstitial) 광고 서비스.
 ///
-/// 계산 버튼을 누를 때마다 호출되지만, 실제 노출은 3회마다 1회만 발생한다
-/// (사용자 경험 보호). 광고가 준비되지 않았거나 로드에 실패해도 계산 흐름은
-/// 절대 막지 않고 조용히 넘어간다.
+/// 계산 버튼을 누를 때마다 호출되지만, 실제 노출은 2회마다 1회만 발생한다
+/// (첫 계산은 광고 없이 가치를 먼저 경험 — AdMob 방해성 광고 정책·리텐션 보호,
+/// 2026-07-09 대장님 결정). 광고가 준비되지 않았거나 로드에 실패해도
+/// 계산 흐름은 절대 막지 않고 조용히 넘어간다.
 class AdService {
   static final AdService _instance = AdService._internal();
   factory AdService() => _instance;
   AdService._internal();
 
-  /// 3회마다 1회 노출
-  static const int _showEveryNCalls = 3;
+  /// 2회마다 1회 노출 (2·4·6…번째 계산 — 첫 계산은 면제)
+  static const int _showEveryNCalls = 2;
 
   /// 구글 공식 테스트 전면광고 ID (Android)
   static const String _testInterstitialId =
@@ -86,7 +87,7 @@ class AdService {
     );
   }
 
-  /// 계산 버튼 클릭마다 호출. 내부 카운터가 3회마다 1회 전면 광고를 표시한다.
+  /// 계산 버튼 클릭마다 호출. 내부 카운터가 2회마다 1회 전면 광고를 표시한다.
   /// 광고가 준비되지 않았으면 조용히 skip (UX 차단 금지).
   Future<void> showInterstitialIfEligible() async {
     _callCount++;
