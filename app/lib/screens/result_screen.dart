@@ -8,9 +8,12 @@ import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../providers/pension_provider.dart';
+import '../models/pension_input.dart';
 import '../models/simulation_result.dart';
+import '../services/health_insurance_estimator.dart';
 import '../services/local_storage_service.dart';
 import '../services/in_app_review_service.dart';
+import '../services/result_narrative.dart';
 import '../widgets/banner_ad_widget.dart';
 
 class ResultScreen extends ConsumerStatefulWidget {
@@ -81,6 +84,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
   @override
   Widget build(BuildContext context) {
     final result = ref.watch(simulationResultProvider);
+    final input = ref.watch(pensionInputProvider);
     final formatter = NumberFormat('#,###');
 
     if (result == null) {
@@ -111,6 +115,10 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 내러티브 헤더 — "이 계획이면 월 ○○만원을 N년간 쓸 수 있습니다"
+            _buildNarrativeHeader(result, input, formatter),
+            const SizedBox(height: 16),
+
             // 한 줄 절세 요약 카드 (공유용)
             _buildShareableCard(result, formatter),
             const SizedBox(height: 16),
@@ -371,6 +379,12 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
             ),
             const SizedBox(height: 20),
 
+            // 건강보험료 카드 (국민연금 입력 시에만)
+            if (input.hasNps) ...[
+              _buildHealthInsuranceCard(input),
+              const SizedBox(height: 20),
+            ],
+
             // 차트
             Container(
               padding: const EdgeInsets.all(20),
@@ -437,15 +451,19 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                       Text('연도별 상세', style: AppTextStyles.h4),
                     ],
                   ),
+                  if (input.hasNps) ...[
+                    const SizedBox(height: 12),
+                    _buildCrevasseSummaryBanner(result, input, formatter),
+                  ],
                   const SizedBox(height: 16),
-                  _buildDetailTable(result, formatter),
+                  _buildDetailTable(result, input, formatter),
                 ],
               ),
             ),
             const SizedBox(height: 20),
 
             // 전문가 팁 & 안내사항
-            _buildExpertTips(),
+            _buildExpertTips(hasNps: input.hasNps),
             const SizedBox(height: 24),
 
             // 다시 계산 버튼
@@ -480,8 +498,195 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
     );
   }
 
+  /// 결과 최상단 내러티브 헤더 — "이 계획이면 월 ○○만원을 N년간 쓸 수 있습니다"
+  /// (v1.1 Task 6, exec-plan §③ "불안 → 숫자")
+  Widget _buildNarrativeHeader(
+    SimulationResult result,
+    PensionInput input,
+    NumberFormat formatter,
+  ) {
+    final narrative = computeWithdrawalNarrative(result, input);
+    final monthlyManwon =
+        formatter.format(narrative.monthlyWithdrawal ~/ 10000);
+
+    final String headline;
+    final String subline;
+    if (narrative.depleted) {
+      headline = '월 $monthlyManwon만원, ${narrative.depletionAge}세에 자산이 소진됩니다';
+      subline = '${narrative.fundedYears}년간은 목표 인출액을 그대로 채울 수 있습니다.';
+    } else {
+      headline = '월 $monthlyManwon만원, ${narrative.fundedYears}년간 쓸 수 있습니다';
+      subline = '시뮬레이션 기간 내내 목표 인출액에 여유가 있습니다.';
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.navy,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            headline,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              height: 1.3,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subline,
+            style: TextStyle(
+              color: Colors.white.withAlpha(200),
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 건강보험료 카드 (국민연금 입력 시에만 렌더) — v1.1 Task 6, exec-plan §②
+  Widget _buildHealthInsuranceCard(PensionInput input) {
+    final estimateInput = HealthInsuranceEstimateInput(
+      annualPublicPensionIncome: input.npsMonthlyAmount! * 12,
+    );
+    final estimate = HealthInsuranceEstimator.estimate(estimateInput);
+    final eligibility =
+        HealthInsuranceEstimator.checkDependentEligibility(estimateInput);
+    final formatter = NumberFormat('#,###');
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.gray200.withAlpha(128),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.local_hospital, color: AppColors.info, size: 24),
+              SizedBox(width: 8),
+              Text('국민연금 개시 후 건강보험료', style: AppTextStyles.h4),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.info.withAlpha(20),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text(
+                  '월 예상 건강보험료(장기요양 포함) ',
+                  style: TextStyle(fontSize: 13, color: AppColors.gray600),
+                ),
+                Text(
+                  '${formatter.format(estimate.monthlyTotalPremium)}원',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.info,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildTipCard(
+            icon: Icons.check_circle,
+            iconColor: AppColors.green,
+            title: '연금계좌 인출은 건보료에 안 잡힙니다',
+            content:
+                '연금계좌(연금저축·IRP) 인출은 현재 기준 건강보험료 부과 소득에 포함되지 않습니다 (제도 변경 가능성 있음).',
+            backgroundColor: AppColors.green.withAlpha(20),
+          ),
+          if (eligibility.dependentDisqualified) ...[
+            const SizedBox(height: 12),
+            _buildTipCard(
+              icon: Icons.warning_amber,
+              iconColor: AppColors.error,
+              title: '피부양자 자격 상실 기준 해당',
+              content: '⚠️ 연소득 2,000만원 초과 — 피부양자 자격 상실 기준(소득 기준)에 해당합니다.',
+              backgroundColor: AppColors.error.withAlpha(20),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Text(
+            '재산(부동산 등) 기준분을 제외한 소득 기준 추정치입니다.',
+            style: TextStyle(fontSize: 12, color: AppColors.gray500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 국민연금 개시 전/후 소득 크레바스 요약 배너 (연도별 상세 표 위)
+  Widget _buildCrevasseSummaryBanner(
+    SimulationResult result,
+    PensionInput input,
+    NumberFormat formatter,
+  ) {
+    final crevasse = computeCrevasseSummary(result, input);
+    final postAmount = crevasse.postNpsAnnualWithdrawal;
+
+    final String text;
+    if (crevasse.gapYears == 0) {
+      text = postAmount != null
+          ? '국민연금이 처음부터 함께 지급되어 별도 공백기 없이 연 '
+              '${formatter.format(postAmount ~/ 10000)}만원을 인출합니다.'
+          : '국민연금이 처음부터 함께 지급됩니다.';
+    } else if (postAmount != null) {
+      text = '개시 전 공백기 ${crevasse.gapYears}년은 연금계좌에서 연 '
+          '${formatter.format(crevasse.preNpsAnnualWithdrawal ~/ 10000)}만원, '
+          '개시 후엔 연 ${formatter.format(postAmount ~/ 10000)}만원만 인출합니다.';
+    } else {
+      text = '시뮬레이션 기간 ${crevasse.gapYears}년 내내 국민연금 개시 전으로, '
+          '연금계좌에서 연 ${formatter.format(crevasse.preNpsAnnualWithdrawal ~/ 10000)}만원을 인출합니다.';
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.navy.withAlpha(15),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.timeline, color: AppColors.navy, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 12.5, color: AppColors.navy, height: 1.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 전문가 팁 & 안내사항 위젯
-  Widget _buildExpertTips() {
+  Widget _buildExpertTips({required bool hasNps}) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -545,6 +750,18 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
             content: '남은 잔액은 입력한 연 수익률로 복리 성장하며, 운용수익은 세법에 따라 과세 재원으로 편입해 계산합니다. 연금수령한도(10년 룰) 초과 인출은 16.5% 과세로 반영됩니다. 4가지 인출 전략을 전 기간 시뮬레이션해 비교한 결과입니다.',
             backgroundColor: AppColors.navy.withAlpha(15),
           ),
+
+          // 5. 국민연금 종합과세 미반영 고지 (국민연금 입력 시에만, TAX_RULES §7.7)
+          if (hasNps) ...[
+            const SizedBox(height: 12),
+            _buildTipCard(
+              icon: Icons.receipt_long,
+              iconColor: AppColors.warning,
+              title: '국민연금은 세금 계산에 미반영',
+              content: '국민연금은 종합과세 대상으로 이번 시뮬레이션의 세금 계산에는 반영되지 않았습니다 (현금흐름만 반영).',
+              backgroundColor: AppColors.warning.withAlpha(20),
+            ),
+          ],
         ],
       ),
     );
@@ -899,13 +1116,20 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
     );
   }
 
-  Widget _buildDetailTable(SimulationResult result, NumberFormat formatter) {
+  Widget _buildDetailTable(
+    SimulationResult result,
+    PensionInput input,
+    NumberFormat formatter,
+  ) {
+    final visibleRows = result.schedule.take(10).toList();
+
     return Table(
-      columnWidths: const {
-        0: FlexColumnWidth(1),
-        1: FlexColumnWidth(2),
-        2: FlexColumnWidth(1.5),
-        3: FlexColumnWidth(1.5),
+      columnWidths: {
+        0: const FlexColumnWidth(1.3),
+        1: const FlexColumnWidth(2),
+        2: const FlexColumnWidth(1.5),
+        3: const FlexColumnWidth(1.5),
+        if (input.hasNps) 4: const FlexColumnWidth(1.3),
       },
       children: [
         TableRow(
@@ -913,20 +1137,28 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
             color: AppColors.gray100,
             borderRadius: BorderRadius.circular(8),
           ),
-          children: const [
-            _TableHeader('연차'),
-            _TableHeader('인출 계좌'),
-            _TableHeader('금액'),
-            _TableHeader('세금'),
+          children: [
+            const _TableHeader('연차'),
+            const _TableHeader('인출 계좌'),
+            const _TableHeader('금액'),
+            const _TableHeader('세금'),
+            if (input.hasNps) const _TableHeader('국민연금'),
           ],
         ),
-        ...result.schedule.take(10).map((year) {
+        ...visibleRows.asMap().entries.map((entry) {
+          final index = entry.key;
+          final year = entry.value;
           final sources = year.withdrawals
               .map((w) => w.source.displayName.replaceAll(' (', '\n('))
               .join(', ');
+          // 국민연금 개시 연도 판정 — 이 해부터 npsAnnualAmount>0이고
+          // 직전 해(표시된 첫 행이면 바로 그 해)는 0이었던 경우.
+          final isNpsStartYear = input.hasNps &&
+              year.npsAnnualAmount > 0 &&
+              (index == 0 || visibleRows[index - 1].npsAnnualAmount == 0);
           return TableRow(
             children: [
-              _TableCell('${year.year}년차\n(${year.age}세)'),
+              _buildYearCell(year, isNpsStartYear),
               _TableCell(sources.isEmpty ? '-' : sources),
               _TableCell('${formatter.format(year.totalAmount ~/ 10000)}만'),
               _TableCell(
@@ -934,19 +1166,62 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                     ? '${formatter.format(year.totalTax ~/ 10000)}만'
                     : '-',
               ),
+              if (input.hasNps)
+                _TableCell(
+                  year.npsAnnualAmount > 0
+                      ? '${formatter.format(year.npsAnnualAmount ~/ 10000)}만'
+                      : '—',
+                ),
             ],
           );
         }),
         if (result.schedule.length > 10)
-          const TableRow(
+          TableRow(
             children: [
-              _TableCell('...'),
-              _TableCell(''),
-              _TableCell(''),
-              _TableCell(''),
+              const _TableCell('...'),
+              const _TableCell(''),
+              const _TableCell(''),
+              const _TableCell(''),
+              if (input.hasNps) const _TableCell(''),
             ],
           ),
       ],
+    );
+  }
+
+  /// '연차' 열 셀 — 국민연금 개시 연도면 배지를 함께 표시한다.
+  Widget _buildYearCell(YearlyWithdrawal year, bool isNpsStartYear) {
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '${year.year}년차\n(${year.age}세)',
+            style: AppTextStyles.caption,
+            textAlign: TextAlign.center,
+          ),
+          if (isNpsStartYear) ...[
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.info,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text(
+                '국민연금 개시',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
