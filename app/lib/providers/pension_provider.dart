@@ -82,8 +82,17 @@ class PensionInputNotifier extends StateNotifier<PensionInput> {
   }
 
   /// 국민연금 월수령액 입력 (5번째 카드 필드 또는 auto-fill)
+  /// 개시연령이 아직 비어있으면 화면 표시 기본값(65세, home_screen.dart
+  /// `input.npsStartAge ?? 65`)과 state를 동기화한다 — 그렇지 않으면 사용자가
+  /// 월수령액만 입력하고 화면의 "65"를 그대로 둘 때 npsStartAge가 null로 남아
+  /// hasNps=false 로 국민연금이 조용히 미반영된다.
+  /// 반대 방향(개시연령만 먼저 입력)은 대칭 처리하지 않는다 — 월수령액은
+  /// 기본값을 지어낼 수 없으므로 기존 부분입력 경고(스낵바)가 정당하다.
   void updateNpsMonthlyAmount(int value) {
-    state = state.copyWith(npsMonthlyAmount: value);
+    state = state.copyWith(
+      npsMonthlyAmount: value,
+      npsStartAge: state.npsStartAge ?? 65,
+    );
   }
 
   /// 국민연금 수급 개시연령 입력 (5번째 카드 필드 또는 auto-fill)

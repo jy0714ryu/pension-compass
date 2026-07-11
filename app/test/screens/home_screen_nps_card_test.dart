@@ -78,5 +78,30 @@ void main() {
       expect(input.hasNps, false);
       expect(find.text('월 예상수령액'), findsNothing);
     });
+
+    testWidgets(
+        '월수령액만 입력하면 개시연령이 화면 표시 기본값(65세)과 동기화되어 hasNps=true 가 된다',
+        (tester) async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const PensionCompassApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 카드를 펼치지 않아도(=개시연령 입력을 건드리지 않아도) 발생하는
+      // 상태/표시 불일치를 재현: 월수령액 필드만 입력.
+      container.read(pensionInputProvider.notifier).updateNpsMonthlyAmount(700000);
+      await tester.pumpAndSettle();
+
+      final input = container.read(pensionInputProvider);
+      expect(input.npsMonthlyAmount, 700000);
+      expect(input.npsStartAge, 65);
+      expect(input.hasNps, true);
+    });
   });
 }

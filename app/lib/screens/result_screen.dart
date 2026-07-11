@@ -649,10 +649,14 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
 
     final String text;
     if (crevasse.gapYears == 0) {
-      text = postAmount != null
-          ? '국민연금이 처음부터 함께 지급되어 별도 공백기 없이 연 '
-              '${formatter.format(postAmount ~/ 10000)}만원을 인출합니다.'
-          : '국민연금이 처음부터 함께 지급됩니다.';
+      if (postAmount == null) {
+        text = '국민연금이 처음부터 함께 지급됩니다.';
+      } else if (postAmount == 0) {
+        text = '국민연금만으로 목표 생활비가 충당됩니다.';
+      } else {
+        text = '국민연금이 첫해부터 반영되어 연금계좌 인출 부담이 연 '
+            '${formatter.format(postAmount ~/ 10000)}만원으로 줄었습니다.';
+      }
     } else if (postAmount != null) {
       text = '개시 전 공백기 ${crevasse.gapYears}년은 연금계좌에서 연 '
           '${formatter.format(crevasse.preNpsAnnualWithdrawal ~/ 10000)}만원, '

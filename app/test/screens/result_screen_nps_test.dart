@@ -113,4 +113,39 @@ void main() {
       );
     });
   });
+
+  group('④크레바스 배너 — 공백기 0년(gapYears=0) 엣지 문구', () {
+    testWidgets(
+        '국민연금이 첫해부터 목표를 초과해 계좌 인출이 0원이면 "충당" 문구로 표시된다',
+        (tester) async {
+      final input = baseInput.copyWith(
+        // 개시연령을 현재 나이와 같게 두어 공백기(gapYears) 0으로 만든다.
+        npsStartAge: 58,
+        // 연 3,600만원 > 목표 연 2,400만원 → 계좌 인출 0원.
+        npsMonthlyAmount: 3000000,
+      );
+      await pumpResultScreen(tester, input);
+
+      expect(find.text('국민연금만으로 목표 생활비가 충당됩니다.'), findsOneWidget);
+      // "연 0만원을 인출합니다" 같은 어색한 문구는 더 이상 나오지 않는다.
+      expect(find.textContaining('연 0만원을 인출'), findsNothing);
+    });
+
+    testWidgets(
+        '국민연금이 첫해부터 반영되지만 계좌 인출이 남아있으면 "줄었습니다" 문구로 표시된다',
+        (tester) async {
+      final input = baseInput.copyWith(
+        npsStartAge: 58,
+        // 연 720만원 < 목표 연 2,400만원 → 계좌 인출 1,680만원 잔존.
+        npsMonthlyAmount: 600000,
+      );
+      await pumpResultScreen(tester, input);
+
+      expect(
+        find.textContaining('국민연금이 첫해부터 반영되어 연금계좌 인출 부담이 연'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('줄었습니다'), findsOneWidget);
+    });
+  });
 }
