@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:pension_compass/main.dart';
+import 'package:pension_compass/models/pension_input.dart';
 import 'package:pension_compass/providers/pension_provider.dart';
 
 void main() {
@@ -102,6 +103,72 @@ void main() {
       expect(input.npsMonthlyAmount, 700000);
       expect(input.npsStartAge, 65);
       expect(input.hasNps, true);
+    });
+  });
+
+  group('loadExample — 국민연금 입력 보존 (E2E 실측 버그 회귀 가드)', () {
+    test('nps 입력 상태에서 loadExample() → hasNps 유지 + 값 보존', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final notifier = container.read(pensionInputProvider.notifier);
+      notifier.setNps(660000, 65); // 미니 계산기 auto-fill과 동일 경로
+      notifier.loadExample();
+
+      final input = container.read(pensionInputProvider);
+      expect(input.hasNps, true);
+      expect(input.npsMonthlyAmount, 660000);
+      expect(input.npsStartAge, 65);
+      // 자산 필드는 예시값으로 교체됐는지 확인 (보존이 통째 무시가 아님을 증명)
+      expect(input.pensionSavings, PensionInput.example().pensionSavings);
+    });
+
+    test('nps 미입력 상태에서 loadExample() → hasNps=false 유지 (기존 동작)', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      container.read(pensionInputProvider.notifier).loadExample();
+
+      final input = container.read(pensionInputProvider);
+      expect(input.hasNps, false);
+      expect(input.npsMonthlyAmount, isNull);
+      expect(input.npsStartAge, isNull);
+    });
+
+    testWidgets(
+        'auto-fill 후 "예시 입력" 탭 → 카드 표시값과 state가 모두 국민연금 유지 (상태/표시 일치)',
+        (tester) async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const PensionCompassApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // auto-fill과 동일 경로로 국민연금 채움 + 카드 펼침
+      container.read(pensionInputProvider.notifier).setNps(660000, 65);
+      final cardTitle = find.text('국민연금 (선택)');
+      await tester.ensureVisible(cardTitle);
+      await tester.pumpAndSettle();
+      await tester.tap(cardTitle);
+      await tester.pumpAndSettle();
+      expect(find.text('66'), findsOneWidget); // 월수령액 66만원 표시
+
+      // 상단 "예시 입력" 탭 — E2E 버그 재현 지점
+      await tester.tap(find.text('예시 입력'));
+      await tester.pumpAndSettle();
+
+      // state 보존
+      final input = container.read(pensionInputProvider);
+      expect(input.hasNps, true);
+      expect(input.npsMonthlyAmount, 660000);
+      expect(input.npsStartAge, 65);
+      // 표시도 그대로 66 — 화면=상태 일치 (기존 버그는 표시 66 + state null)
+      expect(find.text('66'), findsOneWidget);
     });
   });
 }
