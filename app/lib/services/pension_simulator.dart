@@ -143,9 +143,21 @@ class PensionSimulator {
 
     for (int year = 1; year <= input.simulationYears; year++) {
       final age = input.currentAge + year - 1;
+
+      // 국민연금 소득 크레바스 — 개시연령 이후 연간 목표 인출액에서
+      // (월수령액×12)만큼 선차감. 미입력(hasNps=false)이거나 개시 전이면
+      // 0으로 계산되어 기존 동작과 완전히 동일 (하위호환).
+      // 세금 계산엔 일절 반영하지 않는다 — 순수 현금흐름 차감만
+      // (exec-plan §① 보수 가정, TAX_RULES.md §7.7).
+      final npsAnnualAmount = input.hasNps && age >= input.npsStartAge!
+          ? input.npsMonthlyAmount! * 12
+          : 0;
+
       var payoutRemaining = payoutLimitFor(pools, year);
       var bracketRemaining = kAnnualPensionBracket;
-      var remaining = input.targetAnnualWithdrawal;
+      // 국민연금이 목표를 초과해도 연금계좌 인출은 0에서 멈춘다 (음수 인출 금지).
+      var remaining =
+          (input.targetAnnualWithdrawal - npsAnnualAmount).clamp(0, 1 << 60);
       final ledger = <WithdrawalSource, DrawSplit>{};
 
       // 풀 차감 + 원장 기록 + 한도 소진 (amount는 호출부에서 available 이내 보장)
@@ -196,6 +208,7 @@ class PensionSimulator {
         year: year,
         age: age,
         withdrawals: finalizeYearTax(ledger, age, year),
+        npsAnnualAmount: npsAnnualAmount,
       );
       schedule.add(yearly);
       totalTax += yearly.totalTax;

@@ -17,6 +17,8 @@ class LocalStorageService {
   static const String _keyDisclaimerAccepted = 'disclaimer_accepted';
   static const String _keyCalculationCount = 'calculation_count';
   static const String _keyReviewRequested = 'review_requested';
+  static const String _keyNpsMonthlyAmount = 'nps_monthly_amount';
+  static const String _keyNpsStartAge = 'nps_start_age';
 
   final SharedPreferences _prefs;
 
@@ -41,6 +43,18 @@ class LocalStorageService {
     await _prefs.setInt(_keySimulationYears, input.simulationYears);
     await _prefs.setString(_keyIncomeLevel, input.incomeLevel.name);
     await _prefs.setDouble(_keyExpectedReturnRate, input.expectedReturnRate);
+
+    // 국민연금 (선택 — null이면 저장된 값 제거해 미입력 상태로 복원)
+    if (input.npsMonthlyAmount != null) {
+      await _prefs.setInt(_keyNpsMonthlyAmount, input.npsMonthlyAmount!);
+    } else {
+      await _prefs.remove(_keyNpsMonthlyAmount);
+    }
+    if (input.npsStartAge != null) {
+      await _prefs.setInt(_keyNpsStartAge, input.npsStartAge!);
+    } else {
+      await _prefs.remove(_keyNpsStartAge);
+    }
   }
 
   /// 저장된 입력값 불러오기
@@ -65,6 +79,12 @@ class LocalStorageService {
       simulationYears: _prefs.getInt(_keySimulationYears) ?? 20,
       incomeLevel: incomeLevel,
       expectedReturnRate: _prefs.getDouble(_keyExpectedReturnRate) ?? 0.04,
+      npsMonthlyAmount: _prefs.containsKey(_keyNpsMonthlyAmount)
+          ? _prefs.getInt(_keyNpsMonthlyAmount)
+          : null,
+      npsStartAge: _prefs.containsKey(_keyNpsStartAge)
+          ? _prefs.getInt(_keyNpsStartAge)
+          : null,
     );
   }
 

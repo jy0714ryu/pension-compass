@@ -251,6 +251,189 @@ class InputSectionCard extends StatelessWidget {
   }
 }
 
+/// 접이식 입력 섹션 카드 (국민연금 5번째 카드 전용 — 기본 접힘 UX)
+///
+/// [InputSectionCard]와 동일한 시각 스타일을 유지하되, 헤더를 탭하면
+/// [expanded] 상태를 부모에게 알려 펼침/접힘을 전환한다. 펼침 상태는 부모
+/// (`HomeScreen`)가 소유한다 — auto-fill 등으로 외부에서 강제로 펼치기 위함.
+class CollapsibleInputSectionCard extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final bool expanded;
+  final ValueChanged<bool> onExpansionChanged;
+  final String? badgeText;
+  final List<Widget> children;
+
+  const CollapsibleInputSectionCard({
+    super.key,
+    required this.title,
+    required this.icon,
+    required this.expanded,
+    required this.onExpansionChanged,
+    required this.children,
+    this.badgeText,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.gray200.withValues(alpha: 0.5),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: () => onExpansionChanged(!expanded),
+            child: Row(
+              children: [
+                Icon(icon, color: AppColors.navy, size: 24),
+                const SizedBox(width: 8),
+                Text(title, style: AppTextStyles.h4),
+                if (badgeText != null) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.gray100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      badgeText!,
+                      style: AppTextStyles.labelSmall,
+                    ),
+                  ),
+                ],
+                const Spacer(),
+                Icon(
+                  expanded ? Icons.expand_less : Icons.expand_more,
+                  color: AppColors.gray500,
+                ),
+              ],
+            ),
+          ),
+          if (expanded) ...[
+            const SizedBox(height: 20),
+            ...children,
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// 단위 변환 없는 순수 숫자 입력 필드 (가입기간·출생연도 등)
+///
+/// [AmountInputField]와 달리 입력값을 그대로(×10000 하지 않고) 전달한다.
+class PlainNumberInputField extends StatefulWidget {
+  final String label;
+  final int value;
+  final ValueChanged<int> onChanged;
+  final String suffix;
+  final String? helperText;
+
+  const PlainNumberInputField({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.onChanged,
+    this.suffix = '',
+    this.helperText,
+  });
+
+  @override
+  State<PlainNumberInputField> createState() => _PlainNumberInputFieldState();
+}
+
+class _PlainNumberInputFieldState extends State<PlainNumberInputField> {
+  late TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: widget.value > 0 ? widget.value.toString() : '',
+    );
+  }
+
+  @override
+  void didUpdateWidget(PlainNumberInputField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final newText = widget.value > 0 ? widget.value.toString() : '';
+    if (_controller.text != newText) {
+      _controller.text = newText;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(widget.label, style: AppTextStyles.label),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _controller,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: InputDecoration(
+            hintText: '0',
+            suffixText: widget.suffix,
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.gray200),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.gray200),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.navy, width: 2),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
+          ),
+          style: AppTextStyles.bodyLarge.copyWith(color: AppColors.gray800),
+          onChanged: (text) {
+            final value = int.tryParse(text) ?? 0;
+            widget.onChanged(value);
+          },
+        ),
+        if (widget.helperText != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            widget.helperText!,
+            style: AppTextStyles.caption.copyWith(color: AppColors.gray500),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 /// 주요 버튼
 class PrimaryButton extends StatelessWidget {
   final String text;

@@ -81,12 +81,71 @@ class PensionInputNotifier extends StateNotifier<PensionInput> {
     state = state.copyWith(incomeLevel: level);
   }
 
+  /// 국민연금 월수령액 입력 (5번째 카드 필드 또는 auto-fill)
+  /// 개시연령이 아직 비어있으면 화면 표시 기본값(65세, home_screen.dart
+  /// `input.npsStartAge ?? 65`)과 state를 동기화한다 — 그렇지 않으면 사용자가
+  /// 월수령액만 입력하고 화면의 "65"를 그대로 둘 때 npsStartAge가 null로 남아
+  /// hasNps=false 로 국민연금이 조용히 미반영된다.
+  /// 반대 방향(개시연령만 먼저 입력)은 대칭 처리하지 않는다 — 월수령액은
+  /// 기본값을 지어낼 수 없으므로 기존 부분입력 경고(스낵바)가 정당하다.
+  void updateNpsMonthlyAmount(int value) {
+    state = state.copyWith(
+      npsMonthlyAmount: value,
+      npsStartAge: state.npsStartAge ?? 65,
+    );
+  }
+
+  /// 국민연금 수급 개시연령 입력 (5번째 카드 필드 또는 auto-fill)
+  void updateNpsStartAge(int value) {
+    state = state.copyWith(npsStartAge: value);
+  }
+
+  /// 국민연금 월수령액·개시연령 동시 설정 (미니 계산기 auto-fill 전용)
+  void setNps(int monthlyAmount, int startAge) {
+    state = state.copyWith(npsMonthlyAmount: monthlyAmount, npsStartAge: startAge);
+  }
+
+  /// 국민연금 정보 초기화 (5번째 카드 접힘 시)
+  /// ⚠️ copyWith는 `?? this.x` 패턴이라 null로 되돌릴 수 없다 — 새 PensionInput을
+  /// 직접 생성해 npsMonthlyAmount/npsStartAge만 null로 리셋한다.
+  void clearNps() {
+    state = PensionInput(
+      pensionSavings: state.pensionSavings,
+      pensionSavingsDeducted: state.pensionSavingsDeducted,
+      irpBalance: state.irpBalance,
+      irpRetirementPortion: state.irpRetirementPortion,
+      isaMaturity: state.isaMaturity,
+      isaProfit: state.isaProfit,
+      currentAge: state.currentAge,
+      targetAnnualWithdrawal: state.targetAnnualWithdrawal,
+      simulationYears: state.simulationYears,
+      incomeLevel: state.incomeLevel,
+      expectedReturnRate: state.expectedReturnRate,
+      npsMonthlyAmount: null,
+      npsStartAge: null,
+    );
+  }
+
   void reset() {
     state = PensionInput.empty();
   }
 
+  /// 예시 입력 — 자산·기본 정보만 예시값으로 교체하고 **국민연금 입력은 보존**한다.
+  ///
+  /// E2E 실측 버그(갤럭시 S25): auto-fill 후 "예시 입력"을 탭하면
+  /// `PensionInput.example()` 통째 교체로 nps 필드가 null 리셋되는데,
+  /// 5번째 카드의 TextField 컨트롤러는 기존 텍스트("66")를, 개시연령 스텝퍼는
+  /// `?? 65` 기본값을 계속 표시해 — 화면은 입력된 것처럼 보이는데 state는 비어
+  /// 있는 상태/표시 불일치가 발생, 사용자가 국민연금이 반영됐다고 착각한 채
+  /// 잘못된 시뮬레이션 결과를 봤다. 예시 입력은 자산 예시일 뿐 국민연금 입력과
+  /// 무관하므로 현재 nps 값을 그대로 이어붙인다 (copyWith는 null 인자가
+  /// no-op이라 미입력(null) 상태도 자연스럽게 유지된다).
   void loadExample() {
-    state = PensionInput.example();
+    final cur = state;
+    state = PensionInput.example().copyWith(
+      npsMonthlyAmount: cur.npsMonthlyAmount,
+      npsStartAge: cur.npsStartAge,
+    );
   }
 
   /// 저장된 입력값 불러오기

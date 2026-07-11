@@ -80,10 +80,15 @@ class YearlyWithdrawal {
   /// 인출 상세 내역
   final List<WithdrawalDetail> withdrawals;
 
+  /// 그 해 국민연금 수령액 (연액, 원) — 국민연금 미입력이거나 개시 전이면 0
+  /// (v1.1 소득 크레바스 — 연금계좌 인출과 별개 현금흐름, 세금 계산엔 미반영).
+  final int npsAnnualAmount;
+
   const YearlyWithdrawal({
     required this.year,
     required this.age,
     required this.withdrawals,
+    this.npsAnnualAmount = 0,
   });
 
   /// 해당 연도 총 인출액

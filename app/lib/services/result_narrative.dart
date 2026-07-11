@@ -1,0 +1,116 @@
+import '../models/pension_input.dart';
+import '../models/simulation_result.dart';
+
+/// 결과 화면 상단 "불안 → 숫자" 내러티브 계산 결과.
+///
+/// 순수 계산 로직만 담당 — 위젯에 직접 넣지 않고 단위 테스트 가능하게 분리한다
+/// (v1.1 Task 6, exec-plan §③).
+class WithdrawalNarrative {
+  /// 월 인출액 (원) = targetAnnualWithdrawal ÷ 12
+  final int monthlyWithdrawal;
+
+  /// 목표 인출을 온전히 채운 연수 (잔액 고갈 전) — 고갈이 없으면 스케줄 전체 연수
+  final int fundedYears;
+
+  /// 시뮬레이션 기간 중 목표 인출에 미달한 해가 있었는지 (중간 고갈 여부)
+  final bool depleted;
+
+  /// 고갈 나이 (목표 미달 첫 해의 나이) — depleted가 true일 때만 값이 있음
+  final int? depletionAge;
+
+  const WithdrawalNarrative({
+    required this.monthlyWithdrawal,
+    required this.fundedYears,
+    required this.depleted,
+    this.depletionAge,
+  });
+}
+
+/// 국민연금 개시 전/후 소득 크레바스 요약.
+///
+/// hasNps=false 이면 호출하지 않는다(결과 null 아님 — 호출부에서 hasNps 가드).
+class CrevasseSummary {
+  /// 국민연금 개시 전 공백기 연수 (스케줄 시작부터 개시 연도 전까지)
+  final int gapYears;
+
+  /// 공백기 대표 연간 인출액 (원) — 스케줄 첫 해 기준. gapYears가 0이면 0.
+  final int preNpsAnnualWithdrawal;
+
+  /// 개시 이후 대표 연간 인출액 (원) — 개시 연도 기준. 개시 연도가 스케줄에
+  /// 없으면(시뮬레이션 기간이 개시 전에 끝남) null.
+  final int? postNpsAnnualWithdrawal;
+
+  /// 스케줄 내 개시 연도 인덱스 (0-based) — 없으면 null
+  final int? startYearIndex;
+
+  const CrevasseSummary({
+    required this.gapYears,
+    required this.preNpsAnnualWithdrawal,
+    required this.postNpsAnnualWithdrawal,
+    required this.startYearIndex,
+  });
+}
+
+/// 결과 최상단 내러티브 계산 — "이 계획이면 월 ○○만원을 N년간 쓸 수 있습니다".
+///
+/// N은 [SimulationResult.schedule]을 순회하며 각 해의 실제 인출액
+/// ([YearlyWithdrawal.totalAmount])이 그 해의 목표 인출액(연간 목표 - 국민연금
+/// 수령액)에 미달하는 첫 해를 찾는다. 미달하는 해가 없으면 스케줄 전체가
+/// "여유 있음"으로 처리된다.
+WithdrawalNarrative computeWithdrawalNarrative(
+  SimulationResult result,
+  PensionInput input,
+) {
+  final monthlyWithdrawal = (input.targetAnnualWithdrawal / 12).round();
+
+  var fundedYears = 0;
+  int? depletionAge;
+
+  for (final yearRow in result.schedule) {
+    final targetForYear =
+        (input.targetAnnualWithdrawal - yearRow.npsAnnualAmount)
+            .clamp(0, 1 << 60);
+    if (yearRow.totalAmount < targetForYear) {
+      depletionAge = yearRow.age;
+      break;
+    }
+    fundedYears++;
+  }
+
+  return WithdrawalNarrative(
+    monthlyWithdrawal: monthlyWithdrawal,
+    fundedYears: fundedYears,
+    depleted: depletionAge != null,
+    depletionAge: depletionAge,
+  );
+}
+
+/// 국민연금 개시 전/후 크레바스 요약 계산 — hasNps=true 일 때만 호출한다.
+CrevasseSummary computeCrevasseSummary(
+  SimulationResult result,
+  PensionInput input,
+) {
+  final schedule = result.schedule;
+
+  var gapYears = 0;
+  int? startYearIndex;
+  for (var i = 0; i < schedule.length; i++) {
+    if (schedule[i].npsAnnualAmount > 0) {
+      startYearIndex = i;
+      break;
+    }
+    gapYears++;
+  }
+
+  final preNpsAnnualWithdrawal =
+      gapYears > 0 && schedule.isNotEmpty ? schedule[0].totalAmount : 0;
+  final postNpsAnnualWithdrawal =
+      startYearIndex != null ? schedule[startYearIndex].totalAmount : null;
+
+  return CrevasseSummary(
+    gapYears: gapYears,
+    preNpsAnnualWithdrawal: preNpsAnnualWithdrawal,
+    postNpsAnnualWithdrawal: postNpsAnnualWithdrawal,
+    startYearIndex: startYearIndex,
+  );
+}
