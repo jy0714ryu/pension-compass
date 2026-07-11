@@ -152,8 +152,12 @@ class NpsEstimator {
   /// 국민연금 간이 추정 실행
   ///
   /// 산식 (TAX_RULES.md §7.1):
-  /// 기본연금액 = 비례상수 × (A값 + B값) × [1 + 0.05 × (가입월수 - 240) / 12]
+  /// 기본연금액(연액) = 비례상수 × (A값 + B값) × [1 + 0.05 × (가입월수 - 240) / 12]
   /// (20년 초과 가산·20년 미만 감액이 동일 비율이라 단일 식으로 통합)
+  ///
+  /// ★ 산식 결과는 **연액(원/년)** — 월액은 ÷12로 변환한다.
+  /// 검증: B=A(평균소득자)·40년 가입 시 연액 = 1.29×2A×2 = 5.16A,
+  /// 월액 = 5.16A/12 = 0.43A → 소득대체율 43% 정의와 정확히 일치.
   static NpsEstimateResult estimate(NpsEstimateInput input) {
     final normalStartAge = normalStartAgeFor(input.birthYear);
     final clampedIncome =
@@ -176,9 +180,10 @@ class NpsEstimator {
         npsYearBonusRate *
             (input.enrollmentMonths - npsFullCreditYears * 12) /
             12;
-    final basicAmount =
+    // 기본연금액은 연액(원/년) — ÷12로 월액 변환
+    final basicAnnualAmount =
         npsProportionalConstant * (npsAValue + clampedIncome) * coefficient;
-    final basicMonthly = basicAmount.round();
+    final basicMonthly = (basicAnnualAmount / 12).round();
 
     var appliedOffsetYears = 0;
     var adjustmentRate = 0.0;
