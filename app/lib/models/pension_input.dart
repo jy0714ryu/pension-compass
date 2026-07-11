@@ -33,6 +33,14 @@ class PensionInput {
   /// 예상 연평균 운용 수익률 (복리, 예: 0.04 = 4%)
   final double expectedReturnRate;
 
+  /// 국민연금 월 수령액 (원, 선택 입력 — v1.1 소득 크레바스 통합)
+  /// null이면 국민연금 미반영, 기존 동작과 100% 동일 (하위호환).
+  final int? npsMonthlyAmount;
+
+  /// 국민연금 수급 개시연령 (세, 선택 입력)
+  /// null이면 국민연금 미반영, 기존 동작과 100% 동일 (하위호환).
+  final int? npsStartAge;
+
   const PensionInput({
     required this.pensionSavings,
     required this.pensionSavingsDeducted,
@@ -45,7 +53,13 @@ class PensionInput {
     this.simulationYears = 20,
     this.incomeLevel = IncomeLevel.high,
     this.expectedReturnRate = 0.04,
+    this.npsMonthlyAmount,
+    this.npsStartAge,
   });
+
+  /// 국민연금 정보가 완전히 입력되었는지 (월수령액·개시연령 둘 다 있어야 활성)
+  /// — 하나라도 null이면 크레바스 차감 없이 기존 동작과 동일하게 처리.
+  bool get hasNps => npsMonthlyAmount != null && npsStartAge != null;
 
   /// 연금저축 중 세액공제 안 받은 금액
   int get pensionSavingsNonDeducted => pensionSavings - pensionSavingsDeducted;
@@ -74,7 +88,9 @@ class PensionInput {
         currentAge <= 100 &&
         targetAnnualWithdrawal > 0 &&
         expectedReturnRate >= 0 &&
-        expectedReturnRate <= 0.20;
+        expectedReturnRate <= 0.20 &&
+        (npsMonthlyAmount == null || npsMonthlyAmount! >= 0) &&
+        (npsStartAge == null || (npsStartAge! >= 50 && npsStartAge! <= 100));
   }
 
   PensionInput copyWith({
@@ -89,6 +105,8 @@ class PensionInput {
     int? simulationYears,
     IncomeLevel? incomeLevel,
     double? expectedReturnRate,
+    int? npsMonthlyAmount,
+    int? npsStartAge,
   }) {
     return PensionInput(
       pensionSavings: pensionSavings ?? this.pensionSavings,
@@ -102,6 +120,8 @@ class PensionInput {
       simulationYears: simulationYears ?? this.simulationYears,
       incomeLevel: incomeLevel ?? this.incomeLevel,
       expectedReturnRate: expectedReturnRate ?? this.expectedReturnRate,
+      npsMonthlyAmount: npsMonthlyAmount ?? this.npsMonthlyAmount,
+      npsStartAge: npsStartAge ?? this.npsStartAge,
     );
   }
 
