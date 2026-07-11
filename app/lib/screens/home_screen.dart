@@ -10,6 +10,7 @@ import '../widgets/banner_ad_widget.dart';
 import '../services/local_storage_service.dart';
 import '../services/ad_service.dart';
 import 'result_screen.dart';
+import 'nps_calculator_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -20,6 +21,10 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   LocalStorageService? _storage;
+
+  /// 국민연금 5번째 카드 펼침 상태 — 기본 접힘 (기존 사용자 마찰 0).
+  /// 미니 계산기 auto-fill 로 돌아올 때만 true 로 강제 전환된다.
+  bool _npsCardExpanded = false;
 
   @override
   void initState() {
@@ -35,6 +40,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final savedInput = _storage!.loadInput();
     if (savedInput != null) {
       ref.read(pensionInputProvider.notifier).loadFromStorage(savedInput);
+      // 저장된 국민연금 값이 있으면(과거 auto-fill 이력) 카드를 펼쳐서 보여준다.
+      if (savedInput.hasNps && mounted) {
+        setState(() => _npsCardExpanded = true);
+      }
     }
 
     // 면책조항 동의 확인
@@ -60,8 +69,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _onCalculate() async {
-    // 입력값 저장
     final input = ref.read(pensionInputProvider);
+
+    // 국민연금 부분 입력(월수령액·개시연령 중 하나만) 경고 — hasNps AND 게이트라
+    // 시뮬레이션에는 어차피 미반영되지만, 사용자가 값을 넣고도 반영 안 됐다고
+    // 오해하지 않도록 안내한다.
+    final npsPartiallyFilled =
+        (input.npsMonthlyAmount != null) != (input.npsStartAge != null);
+    if (npsPartiallyFilled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('국민연금은 수령액·개시연령을 모두 입력해야 반영됩니다'),
+        ),
+      );
+    }
+
+    // 입력값 저장
     await _storage?.saveInput(input);
 
     // 계산 횟수 증가
@@ -78,6 +101,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         builder: (_) => ResultScreen(storage: _storage),
       ),
     );
+  }
+
+  /// 국민연금 미니 계산기 화면 진입 — auto-fill 로 돌아오면 5번째 카드를 펼친다.
+  Future<void> _openNpsCalculator() async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => NpsCalculatorScreen(storage: _storage),
+      ),
+    );
+    if (result == true && mounted) {
+      setState(() => _npsCardExpanded = true);
+    }
   }
 
   @override
@@ -173,6 +209,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
             const SizedBox(height: 20),
+
+            // 국민연금 미니 계산기 진입 배너
+            InkWell(
+              onTap: _openNpsCalculator,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.info.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border:
+                      Border.all(color: AppColors.info.withValues(alpha: 0.3)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.calculate_outlined, color: AppColors.info),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        '국민연금 예상수령액 계산',
+                        style: TextStyle(
+                          color: AppColors.info,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Icon(Icons.chevron_right, color: AppColors.info),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
 
             // 연금저축 입력
             InputSectionCard(
@@ -273,6 +346,52 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   onChanged: (v) => ref
                       .read(pensionInputProvider.notifier)
                       .updateExpectedReturnRate(v / 100.0),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // 국민연금 (선택) — 5번째 접이식 카드, 기본 접힘 (기존 사용자 마찰 0)
+            CollapsibleInputSectionCard(
+              title: '국민연금 (선택)',
+              icon: Icons.payments_outlined,
+              badgeText: '선택',
+              expanded: _npsCardExpanded,
+              onExpansionChanged: (v) {
+                setState(() => _npsCardExpanded = v);
+                if (!v) {
+                  // 접으면 값도 함께 리셋 — 미입력 상태와 완전히 동일하게 복원
+                  // (기존 4장 폼 동작에 영향 없음이 이 리셋으로 보장됨).
+                  ref.read(pensionInputProvider.notifier).clearNps();
+                }
+              },
+              children: [
+                AmountInputField(
+                  label: '월 예상수령액',
+                  value: input.npsMonthlyAmount ?? 0,
+                  onChanged: (v) => ref
+                      .read(pensionInputProvider.notifier)
+                      .updateNpsMonthlyAmount(v),
+                ),
+                const SizedBox(height: 16),
+                NumberInputField(
+                  label: '수급 개시연령',
+                  value: input.npsStartAge ?? 65,
+                  suffix: '세',
+                  min: 50,
+                  max: 100,
+                  onChanged: (v) => ref
+                      .read(pensionInputProvider.notifier)
+                      .updateNpsStartAge(v),
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: _openNpsCalculator,
+                    icon: const Icon(Icons.calculate_outlined, size: 18),
+                    label: const Text('간이 계산기로 추정하기'),
+                  ),
                 ),
               ],
             ),

@@ -81,6 +81,42 @@ class PensionInputNotifier extends StateNotifier<PensionInput> {
     state = state.copyWith(incomeLevel: level);
   }
 
+  /// 국민연금 월수령액 입력 (5번째 카드 필드 또는 auto-fill)
+  void updateNpsMonthlyAmount(int value) {
+    state = state.copyWith(npsMonthlyAmount: value);
+  }
+
+  /// 국민연금 수급 개시연령 입력 (5번째 카드 필드 또는 auto-fill)
+  void updateNpsStartAge(int value) {
+    state = state.copyWith(npsStartAge: value);
+  }
+
+  /// 국민연금 월수령액·개시연령 동시 설정 (미니 계산기 auto-fill 전용)
+  void setNps(int monthlyAmount, int startAge) {
+    state = state.copyWith(npsMonthlyAmount: monthlyAmount, npsStartAge: startAge);
+  }
+
+  /// 국민연금 정보 초기화 (5번째 카드 접힘 시)
+  /// ⚠️ copyWith는 `?? this.x` 패턴이라 null로 되돌릴 수 없다 — 새 PensionInput을
+  /// 직접 생성해 npsMonthlyAmount/npsStartAge만 null로 리셋한다.
+  void clearNps() {
+    state = PensionInput(
+      pensionSavings: state.pensionSavings,
+      pensionSavingsDeducted: state.pensionSavingsDeducted,
+      irpBalance: state.irpBalance,
+      irpRetirementPortion: state.irpRetirementPortion,
+      isaMaturity: state.isaMaturity,
+      isaProfit: state.isaProfit,
+      currentAge: state.currentAge,
+      targetAnnualWithdrawal: state.targetAnnualWithdrawal,
+      simulationYears: state.simulationYears,
+      incomeLevel: state.incomeLevel,
+      expectedReturnRate: state.expectedReturnRate,
+      npsMonthlyAmount: null,
+      npsStartAge: null,
+    );
+  }
+
   void reset() {
     state = PensionInput.empty();
   }
