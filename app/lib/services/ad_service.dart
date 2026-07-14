@@ -27,6 +27,13 @@ class AdService {
 
   String get _adUnitId => kDebugMode ? _testInterstitialId : _prodInterstitialId;
 
+  /// 개발자 실기기 목록 — 실광고 빌드에서도 항상 테스트 광고만 받도록 등록한다.
+  /// 개발자 본인의 반복 노출·클릭(무효 트래픽)으로 인한 AdMob 계정 정지를 방지.
+  /// 새 기기 추가: 앱 실행 후 logcat의 `setTestDeviceIds(...)` 힌트에 찍힌 ID를 덧붙인다.
+  static const List<String> _testDeviceIds = [
+    '96434B0920C1F7489939FE468DD2C679', // 갤럭시 S25 (개발·E2E 기기)
+  ];
+
   InterstitialAd? _interstitialAd;
   bool _isLoading = false;
   int _callCount = 0;
@@ -37,6 +44,10 @@ class AdService {
   /// MissingPluginException 등은 조용히 흡수하고 앱 흐름을 막지 않는다.
   Future<void> initialize() async {
     try {
+      // 개발 기기를 테스트 기기로 등록 (배너·전면 전역 적용) — 자기 노출 차단.
+      await MobileAds.instance.updateRequestConfiguration(
+        RequestConfiguration(testDeviceIds: _testDeviceIds),
+      );
       await MobileAds.instance.initialize();
       _loadInterstitialAd();
     } catch (e) {
