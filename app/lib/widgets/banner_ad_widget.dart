@@ -16,9 +16,10 @@ class BannerAdWidget extends StatefulWidget {
 class _BannerAdWidgetState extends State<BannerAdWidget> {
   static const String _testBannerId = 'ca-app-pub-3940256099942544/6300978111';
 
+  // release 기본값을 실 유닛으로 하드코딩 — dart-define 누락 방어(2026-07-19).
   static const String _prodBannerId = String.fromEnvironment(
     'ADMOB_BANNER_AD_UNIT_ID',
-    defaultValue: _testBannerId,
+    defaultValue: 'ca-app-pub-7975666616683761/3043710701',
   );
 
   String get _adUnitId => kDebugMode ? _testBannerId : _prodBannerId;

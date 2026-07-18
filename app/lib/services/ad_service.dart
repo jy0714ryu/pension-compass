@@ -20,9 +20,11 @@ class AdService {
       'ca-app-pub-3940256099942544/1033173712';
 
   /// 실제 광고 단위 ID (빌드 시 환경변수로 주입, 미지정 시 테스트 ID 사용)
+  // release 기본값을 실 유닛으로 하드코딩 — dart-define 누락 시에도 테스트 광고가
+  // 출시되지 않도록 방어(2026-07-19, 경조사부와 동일 안전 패턴). override는 유지.
   static const String _prodInterstitialId = String.fromEnvironment(
     'ADMOB_INTERSTITIAL_AD_UNIT_ID',
-    defaultValue: _testInterstitialId,
+    defaultValue: 'ca-app-pub-7975666616683761/2384436395',
   );
 
   String get _adUnitId => kDebugMode ? _testInterstitialId : _prodInterstitialId;
