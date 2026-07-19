@@ -13,6 +13,11 @@ const double kRetirementEffectiveRate = 0.05;
 /// 기타소득세율 (절벽·수령한도 초과)
 const double kPenaltyRate = 0.165;
 
+/// 연금계좌 인출(연금수령) 개시 최소 나이 — 55세 미만은 연금수령 자체가 불가
+/// (소득세법상 연금외수령 16.5%). 시뮬레이션은 55세 전 구간을 인출 없는
+/// 적립(운용)기로 처리하고, 연금수령연차도 55세부터 기산한다 (v1.1.1 감사 I1).
+const int kPensionWithdrawalMinAge = 55;
+
 /// 1,500만원 절벽 판정 대상 (사적연금 과세재원)
 const Set<WithdrawalSource> kBracketSources = {
   WithdrawalSource.pensionDeducted,
@@ -141,8 +146,15 @@ class PensionSimulator {
     var totalTax = 0;
     var totalWithdrawn = 0;
 
+    // 55세 전 적립기 연수 — 연금수령연차(수령한도·퇴직세 감면)는 55세부터 기산
+    final preYears =
+        (kPensionWithdrawalMinAge - input.currentAge).clamp(0, 1 << 32);
+
     for (int year = 1; year <= input.simulationYears; year++) {
       final age = input.currentAge + year - 1;
+      // 55세 미만 = 인출 불가(연금외수령 16.5%) — 적립·운용만 수행
+      final withdrawalActive = age >= kPensionWithdrawalMinAge;
+      final payoutYear = (year - preYears).clamp(1, 1 << 32);
 
       // 국민연금 소득 크레바스 — 개시연령 이후 연간 목표 인출액에서
       // (월수령액×12)만큼 선차감. 미입력(hasNps=false)이거나 개시 전이면
@@ -153,11 +165,12 @@ class PensionSimulator {
           ? input.npsMonthlyAmount! * 12
           : 0;
 
-      var payoutRemaining = payoutLimitFor(pools, year);
+      var payoutRemaining = payoutLimitFor(pools, payoutYear);
       var bracketRemaining = kAnnualPensionBracket;
       // 국민연금이 목표를 초과해도 연금계좌 인출은 0에서 멈춘다 (음수 인출 금지).
-      var remaining =
-          (input.targetAnnualWithdrawal - npsAnnualAmount).clamp(0, 1 << 60);
+      var remaining = withdrawalActive
+          ? (input.targetAnnualWithdrawal - npsAnnualAmount).clamp(0, 1 << 60)
+          : 0;
       final ledger = <WithdrawalSource, DrawSplit>{};
 
       // 풀 차감 + 원장 기록 + 한도 소진 (amount는 호출부에서 available 이내 보장)
@@ -203,11 +216,11 @@ class PensionSimulator {
         draw(src, remaining.clamp(0, available));
       }
 
-      // 3) 연말 세금 확정
+      // 3) 연말 세금 확정 (퇴직세 감면 연차도 연금수령연차 기준)
       final yearly = YearlyWithdrawal(
         year: year,
         age: age,
-        withdrawals: finalizeYearTax(ledger, age, year),
+        withdrawals: finalizeYearTax(ledger, age, payoutYear),
         npsAnnualAmount: npsAnnualAmount,
       );
       schedule.add(yearly);

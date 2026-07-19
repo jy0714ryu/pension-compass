@@ -44,10 +44,20 @@ class _AmountInputFieldState extends State<AmountInputField> {
   @override
   void didUpdateWidget(AmountInputField oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final newText = widget.value > 0 ? _formatter.format(widget.value ~/ 10000) : '';
-    if (_controller.text != newText && !_controller.text.contains(newText)) {
-      _controller.text = newText;
-    }
+    // 표시 텍스트의 파싱값과 외부 state 를 비교해 불일치 시에만 재작성한다.
+    // 문자열 contains 비교는 state=0(newText='')일 때 contains('')가 항상 true 라
+    // 리셋·clamp 가 화면에 반영되지 않는 버그가 있었다 (v1.1.1 감사 C1):
+    // 화면엔 이전 금액이 남고 계산은 0으로 수행 → 세금 과소 표시.
+    // 사용자 타이핑 중에는 파싱값 == state 라 재작성이 일어나지 않아 커서가 유지된다.
+    final clean = _controller.text.replaceAll(',', '');
+    final displayedValue = (int.tryParse(clean) ?? 0) * 10000;
+    if (displayedValue == widget.value) return;
+    final newText =
+        widget.value > 0 ? _formatter.format(widget.value ~/ 10000) : '';
+    _controller.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: newText.length),
+    );
   }
 
   @override

@@ -432,7 +432,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        '55세 미만 해지 시 연금소득세가 아닌\n기타소득세 16.5%가 적용됩니다',
+                        '연금계좌 인출은 55세부터 가능해\n55세까지는 적립·운용만 하고,\n인출은 55세부터 시뮬레이션합니다',
                         style: TextStyle(
                           color: AppColors.warning,
                           fontSize: 14,
