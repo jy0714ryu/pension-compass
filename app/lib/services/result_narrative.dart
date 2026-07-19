@@ -1,5 +1,6 @@
 import '../models/pension_input.dart';
 import '../models/simulation_result.dart';
+import 'pension_simulator.dart' show kPensionWithdrawalMinAge;
 
 /// 결과 화면 상단 "불안 → 숫자" 내러티브 계산 결과.
 ///
@@ -67,6 +68,8 @@ WithdrawalNarrative computeWithdrawalNarrative(
   int? depletionAge;
 
   for (final yearRow in result.schedule) {
+    // 55세 전 적립기 행은 인출 0이 정상 — 고갈·충족 판정 대상에서 제외
+    if (yearRow.age < kPensionWithdrawalMinAge) continue;
     final targetForYear =
         (input.targetAnnualWithdrawal - yearRow.npsAnnualAmount)
             .clamp(0, 1 << 60);
@@ -92,18 +95,25 @@ CrevasseSummary computeCrevasseSummary(
 ) {
   final schedule = result.schedule;
 
+  // 공백기·대표 인출액은 실제 인출이 가능한 55세 이후 행 기준으로 계산한다
+  // (55세 전 적립기 행은 인출 0이라 공백기 연수·대표액을 왜곡).
   var gapYears = 0;
   int? startYearIndex;
+  int? firstActiveIndex;
   for (var i = 0; i < schedule.length; i++) {
     if (schedule[i].npsAnnualAmount > 0) {
       startYearIndex = i;
       break;
     }
-    gapYears++;
+    if (schedule[i].age >= kPensionWithdrawalMinAge) {
+      firstActiveIndex ??= i;
+      gapYears++;
+    }
   }
 
-  final preNpsAnnualWithdrawal =
-      gapYears > 0 && schedule.isNotEmpty ? schedule[0].totalAmount : 0;
+  final preNpsAnnualWithdrawal = gapYears > 0 && firstActiveIndex != null
+      ? schedule[firstActiveIndex].totalAmount
+      : 0;
   final postNpsAnnualWithdrawal =
       startYearIndex != null ? schedule[startYearIndex].totalAmount : null;
 
