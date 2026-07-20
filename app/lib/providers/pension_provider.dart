@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/pension_input.dart';
 import '../models/saved_scenario.dart';
 import '../models/simulation_result.dart';
+import '../services/monte_carlo_simulator.dart';
 import '../services/withdrawal_optimizer.dart';
 import '../services/local_storage_service.dart';
 
@@ -182,6 +183,18 @@ final canSimulateProvider = Provider<bool>((ref) {
 final totalAssetsProvider = Provider<int>((ref) {
   final input = ref.watch(pensionInputProvider);
   return input.totalAssets;
+});
+
+/// 몬테카를로 성공률 Provider (v1.3)
+///
+/// 1,000경로 실측 5ms(JIT 기준, AOT 는 더 빠름)라 isolate 없이 동기 계산한다.
+/// 입력이 같으면 시드가 같아 항상 같은 결과 — 재계산마다 확률이 흔들리지
+/// 않는다 (신뢰 보호). 결과가 null 이면 시뮬레이션 불가 상태.
+final monteCarloProvider = Provider<MonteCarloSummary?>((ref) {
+  final input = ref.watch(pensionInputProvider);
+  final result = ref.watch(simulationResultProvider);
+  if (result == null) return null;
+  return MonteCarloSimulator.simulate(input, result.optimalStrategyId);
 });
 
 /// 저장된 시나리오 목록 Provider (v1.2 — 시나리오 저장·비교)

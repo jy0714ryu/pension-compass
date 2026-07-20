@@ -53,7 +53,10 @@ class PensionSimulator {
         (pools[WithdrawalSource.irpSelf] ?? 0) +
         (pools[WithdrawalSource.earnings] ?? 0) +
         (pools[WithdrawalSource.irpRetirement] ?? 0);
-    return (base * 12) ~/ ((11 - year) * 10);
+    final limit = (base * 12) ~/ ((11 - year) * 10);
+    // 몬테카를로 손실 연도에는 earnings 풀이 음수가 되어 평가액 합이 음수일 수
+    // 있다 — 한도는 0 하한 (음수 한도는 clamp(0, 음수) ArgumentError 유발).
+    return limit < 0 ? 0 : limit;
   }
 
   /// 연말 세금 확정 — 절벽·수령한도 초과·퇴직세 감면을 연간 합산 기준으로 일괄 판정
@@ -131,7 +134,15 @@ class PensionSimulator {
   }
 
   /// 단일 전략 시뮬레이션 — 연 단위 인출 → 연말 세금 확정 → 복리 성장 편입
-  static StrategyOutcome run(PensionInput input, WithdrawalStrategy strategy) {
+  ///
+  /// [yearlyReturns] 지정 시 해당 연차(index = year-1)의 수익률로 성장을 계산한다
+  /// — 몬테카를로 경로 시뮬레이션용 (v1.3). 미지정이면 기존과 동일하게
+  /// [PensionInput.expectedReturnRate] 고정 수익률.
+  static StrategyOutcome run(
+    PensionInput input,
+    WithdrawalStrategy strategy, {
+    List<double>? yearlyReturns,
+  }) {
     final pools = <WithdrawalSource, int>{
       WithdrawalSource.isaProfit: input.isaProfit,
       WithdrawalSource.isaPrincipal: input.isaPrincipal,
@@ -230,9 +241,12 @@ class PensionSimulator {
       // 4) 복리 성장 — 남은 잔액 × 수익률, 전액 과세재원(운용수익) 편입
       // 비과세 풀(ISA·비공제분)의 성장분도 과세 earnings로 편입 — 보수적
       // 단순화 (ISA 만기 후 연금계좌 이전 가정, UI '시뮬레이션 가정' 팁에 고지).
+      final rate = yearlyReturns != null && year - 1 < yearlyReturns.length
+          ? yearlyReturns[year - 1]
+          : input.expectedReturnRate;
       var growth = 0;
       pools.forEach((src, balance) {
-        if (balance > 0) growth += (balance * input.expectedReturnRate).round();
+        if (balance > 0) growth += (balance * rate).round();
       });
       pools[WithdrawalSource.earnings] =
           (pools[WithdrawalSource.earnings] ?? 0) + growth;
