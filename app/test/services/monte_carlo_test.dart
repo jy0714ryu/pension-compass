@@ -94,6 +94,13 @@ void main() {
     expect(mc.successRate, inInclusiveRange(0, 100));
   });
 
+  test('고갈 경로의 기말 잔액은 음수가 아닌 0 (실측 -1,038만원 버그 회귀 가드)', () {
+    final mc = MonteCarloSimulator.simulate(
+      poorInput, winnerOf(poorInput), paths: 300);
+    expect(mc.p10FinalBalance, greaterThanOrEqualTo(0));
+    expect(mc.p50FinalBalance, greaterThanOrEqualTo(0));
+  });
+
   test('백분위 순서 p10 <= p50 <= p90', () {
     final mc = MonteCarloSimulator.simulate(
       richInput, winnerOf(richInput), paths: 300);

@@ -92,7 +92,9 @@ class MonteCarloSimulator {
       );
       final outcome =
           PensionSimulator.run(input, strategy, yearlyReturns: returns);
-      finals[p] = outcome.finalBalance;
+      // 손실 누적 시 내부 회계상 음수 합이 나올 수 있으나 실제 잔액은 0 하한
+      // (실측: 고갈 경로에서 비관 잔액 -1,038만원 표시 버그)
+      finals[p] = outcome.finalBalance < 0 ? 0 : outcome.finalBalance;
       if (_pathSucceeded(input, outcome)) successCount++;
     }
 
