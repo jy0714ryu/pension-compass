@@ -141,6 +141,48 @@ class PensionInput {
     );
   }
 
+  /// JSON 직렬화 (시나리오 저장용 — v1.2)
+  Map<String, dynamic> toJson() => {
+        'pensionSavings': pensionSavings,
+        'pensionSavingsDeducted': pensionSavingsDeducted,
+        'irpBalance': irpBalance,
+        'irpRetirementPortion': irpRetirementPortion,
+        'isaMaturity': isaMaturity,
+        'isaProfit': isaProfit,
+        'currentAge': currentAge,
+        'targetAnnualWithdrawal': targetAnnualWithdrawal,
+        'simulationYears': simulationYears,
+        'incomeLevel': incomeLevel.name,
+        'expectedReturnRate': expectedReturnRate,
+        'npsMonthlyAmount': npsMonthlyAmount,
+        'npsStartAge': npsStartAge,
+      };
+
+  factory PensionInput.fromJson(Map<String, dynamic> json) {
+    return PensionInput(
+      pensionSavings: (json['pensionSavings'] as num?)?.toInt() ?? 0,
+      pensionSavingsDeducted:
+          (json['pensionSavingsDeducted'] as num?)?.toInt() ?? 0,
+      irpBalance: (json['irpBalance'] as num?)?.toInt() ?? 0,
+      irpRetirementPortion:
+          (json['irpRetirementPortion'] as num?)?.toInt() ?? 0,
+      isaMaturity: (json['isaMaturity'] as num?)?.toInt() ?? 0,
+      isaProfit: (json['isaProfit'] as num?)?.toInt() ?? 0,
+      currentAge: (json['currentAge'] as num?)?.toInt() ?? 55,
+      targetAnnualWithdrawal:
+          (json['targetAnnualWithdrawal'] as num?)?.toInt() ?? 0,
+      simulationYears: (json['simulationYears'] as num?)?.toInt() ?? 20,
+      incomeLevel: IncomeLevel.values.firstWhere(
+        (e) => e.name == json['incomeLevel'],
+        orElse: () => IncomeLevel.high,
+      ),
+      expectedReturnRate:
+          (json['expectedReturnRate'] as num?)?.toDouble() ?? 0.04,
+      npsMonthlyAmount: (json['npsMonthlyAmount'] as num?)?.toInt(),
+      npsStartAge: (json['npsStartAge'] as num?)?.toInt(),
+    );
+  }
+
   /// 빈 입력 (초기값)
   factory PensionInput.empty() {
     return const PensionInput(

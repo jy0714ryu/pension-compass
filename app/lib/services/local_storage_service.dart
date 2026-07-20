@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/pension_input.dart';
+import '../models/saved_scenario.dart';
 
 /// 로컬 저장소 서비스 - 입력값 자동 저장/불러오기
 class LocalStorageService {
@@ -118,5 +121,50 @@ class LocalStorageService {
   /// 리뷰 요청 여부 확인
   bool isReviewRequested() {
     return _prefs.getBool(_keyReviewRequested) ?? false;
+  }
+
+  // ── 시나리오 저장·비교 (v1.2) ─────────────────────────────────────────
+
+  static const String _keySavedScenarios = 'saved_scenarios';
+
+  /// 저장 가능한 시나리오 최대 개수
+  static const int maxScenarios = 5;
+
+  /// 저장된 시나리오 목록 (최신 저장 순)
+  List<SavedScenario> loadScenarios() {
+    final raw = _prefs.getString(_keySavedScenarios);
+    if (raw == null || raw.isEmpty) return const [];
+    try {
+      final list = jsonDecode(raw) as List;
+      return list
+          .map((e) =>
+              SavedScenario.fromJson((e as Map).cast<String, dynamic>()))
+          .toList();
+    } catch (_) {
+      return const []; // 손상 데이터는 빈 목록으로 (앱 크래시 방지)
+    }
+  }
+
+  /// 시나리오 저장 — 같은 이름은 교체, 초과 시 false 반환 (저장 안 함)
+  Future<bool> saveScenario(SavedScenario scenario) async {
+    final list = List<SavedScenario>.from(loadScenarios())
+      ..removeWhere((s) => s.name == scenario.name);
+    if (list.length >= maxScenarios) return false;
+    list.insert(0, scenario);
+    await _prefs.setString(
+      _keySavedScenarios,
+      jsonEncode(list.map((s) => s.toJson()).toList()),
+    );
+    return true;
+  }
+
+  /// 시나리오 삭제
+  Future<void> deleteScenario(String name) async {
+    final list = List<SavedScenario>.from(loadScenarios())
+      ..removeWhere((s) => s.name == name);
+    await _prefs.setString(
+      _keySavedScenarios,
+      jsonEncode(list.map((s) => s.toJson()).toList()),
+    );
   }
 }

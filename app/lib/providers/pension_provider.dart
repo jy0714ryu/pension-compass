@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/pension_input.dart';
+import '../models/saved_scenario.dart';
 import '../models/simulation_result.dart';
 import '../services/withdrawal_optimizer.dart';
 import '../services/local_storage_service.dart';
@@ -182,3 +183,41 @@ final totalAssetsProvider = Provider<int>((ref) {
   final input = ref.watch(pensionInputProvider);
   return input.totalAssets;
 });
+
+/// 저장된 시나리오 목록 Provider (v1.2 — 시나리오 저장·비교)
+final savedScenariosProvider =
+    StateNotifierProvider<SavedScenariosNotifier, List<SavedScenario>>(
+  (ref) => SavedScenariosNotifier(),
+);
+
+class SavedScenariosNotifier extends StateNotifier<List<SavedScenario>> {
+  /// storage 주입은 테스트 전용 — 실사용은 lazy 생성 (SharedPreferences 캐시됨)
+  SavedScenariosNotifier([this._storage]) : super(const []);
+
+  LocalStorageService? _storage;
+
+  Future<LocalStorageService> _s() async =>
+      _storage ??= await LocalStorageService.create();
+
+  Future<void> load() async {
+    state = (await _s()).loadScenarios();
+  }
+
+  /// 저장 성공 여부 반환 (false = 최대 개수 초과)
+  Future<bool> save(String name, PensionInput input) async {
+    final s = await _s();
+    final ok = await s.saveScenario(SavedScenario(
+      name: name,
+      savedAt: DateTime.now().toIso8601String(),
+      input: input,
+    ));
+    if (ok) state = s.loadScenarios();
+    return ok;
+  }
+
+  Future<void> remove(String name) async {
+    final s = await _s();
+    await s.deleteScenario(name);
+    state = s.loadScenarios();
+  }
+}

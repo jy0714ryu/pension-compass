@@ -1,7 +1,7 @@
 name: pension_compass
 description: "연금나침반 - ISA 연금저축 세금 계산기 & 인출 시뮬레이터"
 publish_to: 'none'
-version: 1.1.1+4
+version: 1.2.0+5
 
 environment:
   sdk: ^3.12.2
@@ -31,6 +31,8 @@ dependencies:
   # gongsi-hanjul 검증판 5.3.1은 구형 Groovy `configurations.all` 문법이 Gradle 9 API와
   # 충돌해 `flutter build apk` 자체가 실패함 — 실측 후 9.0.0으로 전환. compileSdk 36 지원.)
   google_mobile_ads: ^9.0.0
+  share_plus: ^13.2.1
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:

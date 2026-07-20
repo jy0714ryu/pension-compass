@@ -11,6 +11,7 @@ import '../services/local_storage_service.dart';
 import '../services/ad_service.dart';
 import 'result_screen.dart';
 import 'nps_calculator_screen.dart';
+import 'scenario_compare_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -35,6 +36,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _initializeApp() async {
     // 로컬 스토리지 초기화
     _storage = await LocalStorageService.create();
+
+    // 저장된 시나리오 로드 (v1.2 — 시나리오 비교 진입점 노출용)
+    await ref.read(savedScenariosProvider.notifier).load();
 
     // 저장된 입력값 불러오기
     final savedInput = _storage!.loadInput();
@@ -401,6 +405,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             PrimaryButton(
               text: '🔍 최적화 시뮬레이션',
               onPressed: canSimulate ? _onCalculate : null,
+            ),
+            const SizedBox(height: 8),
+
+            // 시나리오 비교 진입점 (v1.2 — 저장된 시나리오가 있을 때만)
+            Consumer(
+              builder: (context, ref, _) {
+                final scenarios = ref.watch(savedScenariosProvider);
+                if (scenarios.isEmpty) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ScenarioCompareScreen(),
+                        ),
+                      ),
+                      icon: const Icon(Icons.balance, size: 18),
+                      label: Text('저장된 시나리오 비교 (${scenarios.length})'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.navy,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 8),
             if (!canSimulate)
