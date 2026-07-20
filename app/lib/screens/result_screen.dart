@@ -18,6 +18,7 @@ import '../models/saved_scenario.dart';
 import '../models/simulation_result.dart';
 import '../services/health_insurance_estimator.dart';
 import '../services/local_storage_service.dart';
+import '../services/monte_carlo_simulator.dart';
 import '../services/in_app_review_service.dart';
 import '../services/result_narrative.dart';
 import '../widgets/banner_ad_widget.dart';
@@ -405,6 +406,10 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
 
             // 전략 비교표 (4전략 토너먼트 전체 결과)
             _buildStrategyComparisonCard(result, formatter),
+            const SizedBox(height: 20),
+
+            // 몬테카를로 성공 확률 (v1.3 — 1,000경로, isolate 계산)
+            _buildMonteCarloCard(formatter),
             const SizedBox(height: 20),
 
             // 건강보험료 카드 (국민연금 입력 시에만)
@@ -1365,6 +1370,103 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
               }),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  /// 몬테카를로 성공 확률 카드 (v1.3)
+  ///
+  /// 고정 수익률 단일 경로의 약점(수익률 순서 위험)을 보완 — 연 수익률을
+  /// 무작위로 흔든 1,000개 미래에서 계획이 성공한 비율과 기말 잔액
+  /// 비관/중간/낙관 3구간을 보여준다.
+  Widget _buildMonteCarloCard(NumberFormat formatter) {
+    final summary = ref.watch(monteCarloProvider);
+    if (summary == null) return const SizedBox.shrink();
+    String won(int v) => '${formatter.format(v ~/ 10000)}만원';
+
+    Color rateColor(int rate) => rate >= 85
+        ? AppColors.green
+        : rate >= 60
+            ? AppColors.warning
+            : AppColors.error;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.gray200.withAlpha(128),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.casino_outlined,
+                      color: AppColors.navy, size: 24),
+                  const SizedBox(width: 8),
+                  Text('계획 성공 확률', style: AppTextStyles.h4),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '수익률이 매년 출렁이는 ${formatter.format(summary.paths)}개의 미래를 시뮬레이션한 결과입니다',
+                style: AppTextStyles.caption.copyWith(color: AppColors.gray500),
+              ),
+              const SizedBox(height: 16),
+              Center(
+                child: Column(
+                  children: [
+                    Text(
+                      '${summary.successRate}%',
+                      style: TextStyle(
+                        fontSize: 44,
+                        fontWeight: FontWeight.w700,
+                        height: 1.0,
+                        color: rateColor(summary.successRate),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${formatter.format(summary.paths)}개 미래 중 ${formatter.format((summary.successRate * summary.paths / 100).round())}개에서 목표 인출 완주',
+                      style: AppTextStyles.caption
+                          .copyWith(color: AppColors.gray500),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              _mcRow('🌧 비관 (하위 10%)', won(summary.p10FinalBalance)),
+              _mcRow('⛅ 중간 (50%)', won(summary.p50FinalBalance)),
+              _mcRow('☀️ 낙관 (상위 10%)', won(summary.p90FinalBalance)),
+              const SizedBox(height: 12),
+              Text(
+                '기말 잔액 기준 · 연 변동성 ${(kMcVolatility * 100).round()}% 가정(주식·채권 혼합형 수준) · 최적 전략 고정',
+                style: AppTextStyles.caption.copyWith(color: AppColors.gray500),
+              ),
+            ],
+      ),
+    );
+  }
+
+  Widget _mcRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: const TextStyle(fontSize: 13, color: AppColors.gray800)),
+          Text(value,
+              style:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
         ],
       ),
     );
