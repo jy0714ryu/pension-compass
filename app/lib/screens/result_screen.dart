@@ -1503,6 +1503,9 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
 📊 최적 인출 순서:
 ${result.optimalSequence.asMap().entries.map((e) => '${e.key + 1}. ${e.value.displayName}').join('\n')}
 
+내 연금은 얼마나 아낄 수 있을까?
+👉 https://play.google.com/store/apps/details?id=com.quantlog.pensioncompass
+
 #연금나침반 #연금저축 #ISA #절세
 ''';
 
