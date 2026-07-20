@@ -14,6 +14,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../providers/pension_provider.dart';
 import '../models/pension_input.dart';
+import '../models/saved_scenario.dart';
 import '../models/simulation_result.dart';
 import '../services/health_insurance_estimator.dart';
 import '../services/local_storage_service.dart';
@@ -110,6 +111,12 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
+          // 시나리오 저장 버튼 (v1.2 — 저장 후 홈에서 2-up 비교)
+          IconButton(
+            icon: const Icon(Icons.bookmark_add_outlined),
+            onPressed: () => _showSaveScenarioDialog(context, input),
+            tooltip: '시나리오로 저장',
+          ),
           // 공유 버튼
           IconButton(
             icon: const Icon(Icons.share),
@@ -1487,6 +1494,64 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  /// 시나리오 저장 다이얼로그 (v1.2)
+  void _showSaveScenarioDialog(BuildContext context, PensionInput input) {
+    final controller =
+        TextEditingController(text: SavedScenario.suggestName(input));
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('시나리오로 저장'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: controller,
+              autofocus: true,
+              maxLength: 20,
+              decoration: const InputDecoration(
+                labelText: '시나리오 이름',
+                hintText: '예: 60세 은퇴·월 200만원',
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '저장 후 홈 화면 "시나리오 비교"에서 나란히 볼 수 있습니다 (최대 ${LocalStorageService.maxScenarios}개, 같은 이름은 덮어쓰기)',
+              style: AppTextStyles.caption.copyWith(color: AppColors.gray500),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final name = controller.text.trim();
+              if (name.isEmpty) return;
+              final messenger = ScaffoldMessenger.of(context);
+              Navigator.pop(dialogContext);
+              final ok = await ref
+                  .read(savedScenariosProvider.notifier)
+                  .save(name, input);
+              messenger.showSnackBar(
+                SnackBar(
+                  content: Text(ok
+                      ? '"$name" 시나리오를 저장했습니다'
+                      : '최대 ${LocalStorageService.maxScenarios}개까지 저장할 수 있습니다 — 홈의 시나리오 비교에서 정리해 주세요'),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+            child: const Text('저장'),
+          ),
         ],
       ),
     );
