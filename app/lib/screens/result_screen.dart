@@ -1,10 +1,15 @@
+import 'dart:io';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../providers/pension_provider.dart';
@@ -27,6 +32,9 @@ class ResultScreen extends ConsumerStatefulWidget {
 
 class _ResultScreenState extends ConsumerState<ResultScreen> {
   bool _reviewRequested = false;
+
+  /// 공유 카드 이미지 캡처용 (RepaintBoundary)
+  final GlobalKey _shareCardKey = GlobalKey();
 
   @override
   void initState() {
@@ -119,8 +127,11 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
             _buildNarrativeHeader(result, input, formatter),
             const SizedBox(height: 16),
 
-            // 한 줄 절세 요약 카드 (공유용)
-            _buildShareableCard(result, formatter),
+            // 한 줄 절세 요약 카드 (공유용 — RepaintBoundary로 이미지 캡처 대상)
+            RepaintBoundary(
+              key: _shareCardKey,
+              child: _buildShareableCard(result, formatter),
+            ),
             const SizedBox(height: 16),
             
             // 최적 인출 순서 카드 (색상 뱃지 적용)
@@ -344,12 +355,18 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                           size: 28,
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          '${formatter.format(result.savings ~/ 10000)}만원 절감',
-                          style: const TextStyle(
-                            color: AppColors.green,
-                            fontSize: 24,
-                            fontWeight: FontWeight.w700,
+                        // 좁은 기기(360dp)에서 4자리 절감액이 오버플로되지 않게 축소
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              '${formatter.format(result.savings ~/ 10000)}만원 절감',
+                              style: const TextStyle(
+                                color: AppColors.green,
+                                fontSize: 24,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -377,6 +394,10 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 20),
+
+            // 전략 비교표 (4전략 토너먼트 전체 결과)
+            _buildStrategyComparisonCard(result, formatter),
             const SizedBox(height: 20),
 
             // 건강보험료 카드 (국민연금 입력 시에만)
@@ -1229,6 +1250,142 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
     );
   }
 
+  /// 전략 비교표 — 4전략 토너먼트 전체 결과 (v1.2)
+  ///
+  /// 우승 판정과 동일한 지표(낸 세금 + 잠재세 = taxBurden) 오름차순으로 정렬해
+  /// 우승 전략을 최상단에 강조한다. 데이터는 엔진이 이미 계산한
+  /// [SimulationResult.outcomes]를 그대로 표시한다 (추가 계산 없음).
+  Widget _buildStrategyComparisonCard(
+    SimulationResult result,
+    NumberFormat formatter,
+  ) {
+    if (result.outcomes.isEmpty) return const SizedBox.shrink();
+    final sorted = [...result.outcomes]
+      ..sort((a, b) => a.taxBurden.compareTo(b.taxBurden));
+
+    String won(int v) => '${formatter.format(v ~/ 10000)}만';
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.gray200.withAlpha(128),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.compare_arrows, color: AppColors.navy, size: 24),
+              const SizedBox(width: 8),
+              Text('전략 비교', style: AppTextStyles.h4),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '4가지 인출 전략을 전 기간 시뮬레이션한 결과입니다\n(총 부담 = 낸 세금 + 남은 잔액의 잠재 세금)',
+            style: AppTextStyles.caption.copyWith(color: AppColors.gray500),
+          ),
+          const SizedBox(height: 12),
+          Table(
+            columnWidths: const {
+              0: FlexColumnWidth(2.4),
+              1: FlexColumnWidth(1.4),
+              2: FlexColumnWidth(1.4),
+              3: FlexColumnWidth(1.6),
+            },
+            children: [
+              TableRow(
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: AppColors.gray200),
+                  ),
+                ),
+                children: const [
+                  _TableHeader('전략'),
+                  _TableHeader('낸 세금'),
+                  _TableHeader('잠재세'),
+                  _TableHeader('총 부담'),
+                ],
+              ),
+              ...sorted.asMap().entries.map((entry) {
+                final isWinner = entry.key == 0;
+                final o = entry.value;
+                final style = TextStyle(
+                  fontSize: 13,
+                  height: 1.3,
+                  fontWeight: isWinner ? FontWeight.w700 : FontWeight.w400,
+                  color: isWinner ? AppColors.navy : AppColors.gray800,
+                );
+                return TableRow(
+                  decoration: BoxDecoration(
+                    color: isWinner
+                        ? AppColors.green.withAlpha(24)
+                        : Colors.transparent,
+                  ),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Text(
+                        isWinner ? '🏆 ${o.strategyName}' : o.strategyName,
+                        style: style,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Text(won(o.totalTax),
+                          textAlign: TextAlign.right, style: style),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Text(won(o.latentTax),
+                          textAlign: TextAlign.right, style: style),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Text(won(o.taxBurden),
+                          textAlign: TextAlign.right, style: style),
+                    ),
+                  ],
+                );
+              }),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 공유 카드 이미지를 PNG로 캡처해 시스템 공유 시트로 전달 (v1.2)
+  Future<void> _shareCardAsImage(String shareText) async {
+    final boundary = _shareCardKey.currentContext?.findRenderObject()
+        as RenderRepaintBoundary?;
+    if (boundary == null) {
+      throw StateError('공유 카드를 찾을 수 없습니다');
+    }
+    final image = await boundary.toImage(pixelRatio: 3.0);
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    if (byteData == null) {
+      throw StateError('이미지 변환에 실패했습니다');
+    }
+    final dir = await getTemporaryDirectory();
+    final file = File(
+      '${dir.path}/pension_compass_result_'
+      '${DateTime.now().millisecondsSinceEpoch}.png',
+    );
+    await file.writeAsBytes(byteData.buffer.asUint8List());
+    await SharePlus.instance.share(
+      ShareParams(files: [XFile(file.path)], text: shareText),
+    );
+  }
+
   /// 공유용 한 줄 절세 카드
   Widget _buildShareableCard(SimulationResult result, NumberFormat formatter) {
     return Container(
@@ -1266,40 +1423,70 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          Text(
-            '${formatter.format(result.savings ~/ 10000)}만원',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 48,
-              fontWeight: FontWeight.w700,
-              height: 1.0,
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            '절감!',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withAlpha(40),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              '일반 인출 대비 ${result.savingsRate.toStringAsFixed(1)}% 절감',
+          if (result.savings > 0) ...[
+            Text(
+              '${formatter.format(result.savings ~/ 10000)}만원',
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
+                fontSize: 48,
+                fontWeight: FontWeight.w700,
+                height: 1.0,
               ),
             ),
-          ),
+            const SizedBox(height: 4),
+            const Text(
+              '절감!',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withAlpha(40),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                '일반 인출 대비 ${result.savingsRate.toStringAsFixed(1)}% 절감',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ] else ...[
+            // 절감액 0 = 전액 비과세 등으로 이미 최적 — "0만원 절감!" 대신 긍정 카피
+            const Text(
+              '이미 최적 인출 순서입니다',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 28,
+                fontWeight: FontWeight.w700,
+                height: 1.2,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withAlpha(40),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Text(
+                '어떤 순서로 인출해도 세금 차이가 없는 구성입니다',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1338,15 +1525,20 @@ ${result.optimalSequence.asMap().entries.map((e) => '${e.key + 1}. ${e.value.dis
               ),
             ),
             const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.gray100,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                shareText,
-                style: const TextStyle(fontSize: 14, height: 1.5),
+            // 미리보기 — 인출 순서가 길면 시트 높이를 넘으므로 스크롤로 수용
+            Flexible(
+              child: SingleChildScrollView(
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.gray100,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    shareText,
+                    style: const TextStyle(fontSize: 14, height: 1.5),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 20),
@@ -1374,15 +1566,19 @@ ${result.optimalSequence.asMap().entries.map((e) => '${e.key + 1}. ${e.value.dis
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () {
-                      // TODO: 이미지 캡처 및 공유 기능 (share_plus 패키지 필요)
+                    onPressed: () async {
+                      final messenger = ScaffoldMessenger.of(context);
                       Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('이미지 공유 기능은 추후 업데이트 예정입니다'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
+                      try {
+                        await _shareCardAsImage(shareText);
+                      } catch (e) {
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text('이미지 공유에 실패했습니다: $e'),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      }
                     },
                     icon: const Icon(Icons.share),
                     label: const Text('이미지 공유'),
