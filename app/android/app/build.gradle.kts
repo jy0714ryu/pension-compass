@@ -15,7 +15,7 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.quantlog.pension_compass"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36  // targetSdk 36 요구 (flutter 기본값이 낮을 수 있어 명시)
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -35,7 +35,10 @@ android {
     defaultConfig {
         applicationId = "com.quantlog.pensioncompass"
         minSdk = flutter.minSdkVersion
-        targetSdk = 35  // Android 15 (AdMob WorkManager 호환성)
+        // Play 정책(2026-08-31): 최신 안드로이드 1년 이내 타겟 필수 — API 36.
+        // 구 35 고정 사유였던 AdMob WorkManager 크래시는 work-runtime 2.10.1
+        // 명시 + proguard keep 으로 근본 수정됨 (dd52da7) — 실기기 기동 검증 완료.
+        targetSdk = 36  // Android 16
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
