@@ -48,11 +48,13 @@ dev_dependencies:
   # 앱 아이콘 생성
   flutter_launcher_icons: ^0.14.3
 
-# 앱 아이콘 설정 (공시한줄과 동일: adaptive icon 미사용)
+# 앱 아이콘 설정 — 실사 나침반 리브랜딩 (2026-07-23, adaptive icon 적용)
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/icons/app_icon.png"
+  adaptive_icon_background: "#0b1b34"
+  adaptive_icon_foreground: "assets/icons/app_icon_foreground.png"
   min_sdk_android: 21
 
 # For information on the generic Dart part of this file, see the
